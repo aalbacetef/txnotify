@@ -1,111 +1,65 @@
 package rpc
 
-import (
-	"bytes"
-	"encoding/json"
-	"fmt"
-	"math/rand"
+const (
+	getCurrentBlockMethod                       = "eth_blockNumber"
+	getBlockByNumberEndpoint                    = "eth_getBlockByNumber"
+	getTransactionCountByNumberEndpoint         = "eth_getBlockTransactionCountByNumber"
+	getTransactionByBlockNumberAndIndexEndpoint = "eth_getTransactionByBlockNumberAndIndex"
 )
 
-type GetCurrentBlockRequest struct {
-	JSONRPC string `json:"jsonrpc"`
-	Method  string `json:"method"`
-	Params  []any  `json:"params"`
-	ID      int    `json:"id"`
-}
+func (client *Client) GetCurrentBlockNumber() (*Response[string], error) {
+	endpoint := getCurrentBlockMethod
 
-type GetCurrentBlockResponse Response[string]
-
-func (client *Client) GetCurrentBlock() (*GetCurrentBlockResponse, error) {
-	id := rand.Intn(100) // AA: to improve
-
-	payload := GetCurrentBlockRequest{
-		JSONRPC: "2.0",
-		Method:  "eth_blockNumber",
-		Params:  []any{},
-		ID:      id,
-	}
-
-	body := &bytes.Buffer{}
-
-	if err := json.NewEncoder(body).Encode(payload); err != nil {
-		return nil, fmt.Errorf("could not encode body: %w", err)
-	}
-
-	resp, err := client.httpClient.Post(
-		client.endpoint,
-		"application/json",
-		body,
-	)
+	response, err := Do[string](client, endpoint, []any{})
 	if err != nil {
-		return nil, fmt.Errorf("post failed: %w", err)
+		return nil, err
 	}
 
-	defer resp.Body.Close()
-
-	respBody := GetCurrentBlockResponse{}
-
-	if err := json.NewDecoder(resp.Body).Decode(&respBody); err != nil {
-		return nil, fmt.Errorf("could not decode response body: %w", err)
-	}
-
-	if respBody.ID != id {
-		return nil, fmt.Errorf("id mismatch: got %d, want %d", respBody.ID, id)
-	}
-
-	return &respBody, nil
+	return response, nil
 }
 
-type GetBlockByNumberRequest struct {
-	JSONRPC string `json:"jsonrpc"`
-	Method  string `json:"method"`
-	Params  []any  `json:"params"`
-	ID      int    `json:"id"`
-}
-
-// We only care about a few fields
-type GetBlockByNumberResponseInner struct {
+// NOTE: We only care about a few fields.
+type GetBlockByNumberPayload struct {
 	Hash         string   `json:"hash"`
 	Transactions []string `json:"transactions"`
 }
 
-type GetBlockByNumberResponse Response[GetBlockByNumberResponseInner]
+// GetBlockByNumber will return block information (hash and transaction hashes) given the block's number as a hex-string.
+func (client *Client) GetBlockByNumber(blockNum string) (*Response[GetBlockByNumberPayload], error) {
+	endpoint := getBlockByNumberEndpoint
 
-func (client *Client) GetBlockByNumber(blockNum int) (*GetBlockByNumberResponse, error) {
-	id := rand.Intn(100) // AA: to improve
+	const getFullBlock = false
 
-	payload := GetBlockByNumberRequest{
-		JSONRPC: "2.0",
-		Method:  "eth_getBlockByNumber",
-		Params: []any{
-			fmt.Sprintf("%#0x", blockNum),
-			false,
-		},
-		ID: id,
+	params := []any{
+		blockNum,
+		getFullBlock,
 	}
 
-	body := &bytes.Buffer{}
-
-	if err := json.NewEncoder(body).Encode(payload); err != nil {
-		return nil, fmt.Errorf("could not encode body: %w", err)
-	}
-
-	resp, err := client.httpClient.Post(
-		client.endpoint,
-		"application/json",
-		body,
-	)
+	response, err := Do[GetBlockByNumberPayload](client, endpoint, params)
 	if err != nil {
-		return nil, fmt.Errorf("post failed: %w", err)
+		return nil, err
 	}
 
-	defer resp.Body.Close()
+	return response, nil
+}
 
-	respBody := GetBlockByNumberResponse{}
+// GetTransactionCountByNumber will fetch the transaction count for a block. Result is a hex-string corresponding to the transaction count. It expects the blockNum to be a hex-string.
+func (client *Client) GetTransactionCountByNumber(blockNum string) (*Response[string], error) {
+	endpoint := getTransactionCountByNumberEndpoint
+	params := []any{blockNum}
 
-	if err := json.NewDecoder(resp.Body).Decode(&respBody); err != nil {
-		return nil, fmt.Errorf("could not decode response body: %w", err)
-	}
+	response, err := Do[string](client, endpoint, params)
 
-	return &respBody, nil
+	return response, err
+}
+
+// GetTransactionByBlockNumberAndIndex will fetch the transaction corresponding to the given block and index. It expects both inputs to be hex strings.
+func (client *Client) GetTransactionByBlockNumberAndIndex(blockNum, index string) (*Response[Transaction], error) {
+	endpoint := getTransactionByBlockNumberAndIndexEndpoint
+
+	params := []any{blockNum, index}
+
+	response, err := Do[Transaction](client, endpoint, params)
+
+	return response, err
 }
