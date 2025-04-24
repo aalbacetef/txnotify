@@ -89,7 +89,7 @@ func TestGetTransactionCount(t *testing.T) {
 	}
 }
 
-func TestGetTransaction(t *testing.T) {
+func TestGetTransactionByBlockNumberAndIndex(t *testing.T) {
 	client := mustMakeClient(t, testEndpoint)
 
 	txIndex := "0x1"
@@ -103,6 +103,23 @@ func TestGetTransaction(t *testing.T) {
 
 	if err := json.NewDecoder(bytes.NewReader(testTransaction)).Decode(&savedResponse); err != nil {
 		t.Fatalf("could not decode saved response: %v", err)
+	}
+
+	compareTransaction(t, response.Result, savedResponse.Result)
+}
+
+func TestGetTransactionByHash(t *testing.T) {
+	client := mustMakeClient(t, testEndpoint)
+
+	savedResponse := Response[ethereum.Transaction]{}
+
+	if err := json.NewDecoder(bytes.NewReader(testTransaction)).Decode(&savedResponse); err != nil {
+		t.Fatalf("could not decode saved response: %v", err)
+	}
+
+	response, err := client.GetTransactionByHash(savedResponse.Result.Hash)
+	if err != nil {
+		t.Fatalf("could not fetch block: %v", err)
 	}
 
 	compareTransaction(t, response.Result, savedResponse.Result)
