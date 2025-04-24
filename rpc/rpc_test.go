@@ -71,15 +71,19 @@ func TestGetBlockInfo(t *testing.T) {
 func TestGetTransactionCount(t *testing.T) {
 	client := mustMakeClient(t, testEndpoint)
 
-	wantCount := "0x42"
-
 	response, err := client.GetTransactionCountByNumber(testBlockNumber)
 	if err != nil {
 		t.Fatalf("could not fetch block: %v", err)
 	}
 
-	if response.Result != wantCount {
-		t.Fatalf("got %s, want %s", response.Result, wantCount)
+	savedResponse := Response[string]{}
+
+	if err := json.NewDecoder(bytes.NewReader(testTransactionCount)).Decode(&savedResponse); err != nil {
+		t.Fatalf("could not decode saved response: %v", err)
+	}
+
+	if response.Result != savedResponse.Result {
+		t.Fatalf("got %s, want %s", response.Result, savedResponse.Result)
 	}
 }
 
