@@ -26,6 +26,7 @@ func NewWatcher(rpcEndpoint string, pollInterval time.Duration) (*Watcher, error
 		pollInterval: pollInterval,
 		rpcClient:    client,
 		logger:       slog.New(slog.NewJSONHandler(os.Stdout, nil)),
+		cache:        NewInMemoryCache(),
 	}
 
 	return watcher, nil
@@ -37,12 +38,14 @@ type Watcher struct {
 	cancel        context.CancelFunc
 	pollInterval  time.Duration
 	rpcClient     RPCClient
+	cache         Cache
 	currentBlock  string
 	latestBlock   string
 	logger        *slog.Logger
 }
 
 type RPCClient interface {
+	GetBlockByNumber(blockNum string) (*rpc.Response[ethereum.Block], error)
 	GetCurrentBlockNumber() (*rpc.Response[string], error)
 	GetTransactionByBlockNumberAndIndex(blockNum, index string) (*rpc.Response[ethereum.Transaction], error)
 	GetTransactionCountByNumber(blockNum string) (*rpc.Response[string], error)
@@ -107,7 +110,10 @@ func (watcher *Watcher) checkNewBlock() {
 		return
 	}
 
-	watcher.logger.Info("new block number", "block number", blockNumber)
+	watcher.logger.Info(
+		"new block number",
+		"block number", blockNumber,
+	)
 	watcher.latestBlock = blockNumber
 }
 
@@ -138,22 +144,23 @@ func (watcher *Watcher) processNextBlock() {
 	nextBlockNum := numToStr(currentBlockNum + offset)
 	watcher.logger.Info("processing next block", "nextBlockNum", nextBlockNum)
 
-	resp, err := watcher.rpcClient.GetTransactionCountByNumber(nextBlockNum)
+	blockInfoResp, err := watcher.rpcClient.GetBlockByNumber(nextBlockNum)
 	if err != nil {
-		watcher.logger.Error("could not fetch transaction count", "error", err)
+		watcher.logger.Error("could not get block info", "blockNum", nextBlockNum)
 		return
 	}
+
+	if err := watcher.cache.AddBlock(nextBlockNum, blockInfoResp.Result); err != nil {
+		watcher.logger.Error("could not store block info to cache", "error", err)
+		return
+	}
+
+	count := len(blockInfoResp.Result.Transactions)
 
 	watcher.logger.Info(
 		"got transaction count",
-		"count", resp.Result,
+		"count", count,
 	)
-
-	count, err := strToHex(resp.Result)
-	if err != nil {
-		watcher.logger.Error("could not parse transaction count string", "countStr", resp.Result)
-		return
-	}
 
 	watcher.logger.Info("got block transaction count", "blockNum", nextBlockNum, "count", count)
 

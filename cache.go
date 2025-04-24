@@ -8,12 +8,24 @@ import (
 )
 
 type Cache interface {
-	AddBlock(block ethereum.Block) error
-	AddTransaction(tx ethereum.Transaction) error
-	GetTransaction(hash string) (ethereum.Transaction, error)
+	AddBlock(blockNum string, block ethereum.Block) error
+	GetBlock(blockNum string) (ethereum.Block, error)
+	GetBlockProcessed(blockNum string) (bool, error)
+	SetBlockProcessed(blockNum string) error
+	AddTx(tx ethereum.Transaction) error
+	GetTx(hash string) (ethereum.Transaction, error)
 	TxForAddress(address string) ([]ethereum.Transaction, error)
 	Subscribe(address string) error
 	Unsubscribe(address string) error
+}
+
+func NewInMemoryCache() *InMemoryCache {
+	return &InMemoryCache{
+		subscribedAddress: make([]string, 0),
+		transactions:      make(map[string]ethereum.Transaction),
+		blocks:            make(map[string]ethereum.Block),
+		processedBlocks:   make(map[string]bool),
+	}
 }
 
 type InMemoryCache struct {
@@ -38,6 +50,18 @@ func (cache *InMemoryCache) AddBlock(blockNum string, block ethereum.Block) erro
 	return nil
 }
 
+func (cache *InMemoryCache) GetBlockProcessed(blockNum string) (bool, error) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	v, found := cache.processedBlocks[blockNum]
+	if !found {
+		return false, fmt.Errorf("block with number %s not found", blockNum)
+	}
+
+	return v, nil
+}
+
 func (cache *InMemoryCache) SetBlockProcessed(blockNum string) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
@@ -51,7 +75,7 @@ func (cache *InMemoryCache) SetBlockProcessed(blockNum string) error {
 	return nil
 }
 
-func (cache *InMemoryCache) AddTransaction(tx ethereum.Transaction) error {
+func (cache *InMemoryCache) AddTx(tx ethereum.Transaction) error {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
@@ -63,7 +87,7 @@ func (cache *InMemoryCache) AddTransaction(tx ethereum.Transaction) error {
 	return nil
 }
 
-func (cache *InMemoryCache) GetTransaction(hash string) (ethereum.Transaction, error) {
+func (cache *InMemoryCache) GetTx(hash string) (ethereum.Transaction, error) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 

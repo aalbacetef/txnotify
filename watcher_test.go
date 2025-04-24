@@ -2,12 +2,10 @@ package txnotify
 
 import (
 	"bytes"
-	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"os"
 	"testing"
 	"time"
 
@@ -54,16 +52,16 @@ func TestWatcher(t *testing.T) {
 		}
 
 		watcher.checkNewBlock()
-
 		watcher.processNextBlock()
 	})
 }
 
 type mockRPCClient struct {
-	blockNum string
-	index    string
-	txCount  *rpc.Response[string]
-	txData   *rpc.Response[ethereum.Transaction]
+	blockNum  string
+	index     string
+	txCount   *rpc.Response[string]
+	txData    *rpc.Response[ethereum.Transaction]
+	blockInfo *rpc.Response[ethereum.Block]
 }
 
 //go:embed rpc/testdata/tx-count.0x154d535.json
@@ -72,14 +70,18 @@ var testTxCountFile []byte
 //go:embed rpc/testdata/tx.0x154d535.0x1.json
 var testTxDataFile []byte
 
+//go:embed rpc/testdata/block.0x154d535.json
+var testBlockInfoFile []byte
+
 func mustCreateMockClient(t *testing.T) *mockRPCClient {
 	t.Helper()
 
 	mock := &mockRPCClient{
-		blockNum: "0x154d535",
-		index:    "0x1",
-		txCount:  &rpc.Response[string]{},
-		txData:   &rpc.Response[ethereum.Transaction]{},
+		blockNum:  "0x154d535",
+		index:     "0x1",
+		txCount:   &rpc.Response[string]{},
+		txData:    &rpc.Response[ethereum.Transaction]{},
+		blockInfo: &rpc.Response[ethereum.Block]{},
 	}
 
 	if err := json.NewDecoder(bytes.NewReader(testTxCountFile)).Decode(mock.txCount); err != nil {
@@ -90,7 +92,19 @@ func mustCreateMockClient(t *testing.T) *mockRPCClient {
 		t.Fatalf("error decoding tx data file: %v", err)
 	}
 
+	if err := json.NewDecoder(bytes.NewReader(testBlockInfoFile)).Decode(mock.blockInfo); err != nil {
+		t.Fatalf("error decoding block info file: %v", err)
+	}
+
 	return mock
+}
+
+func (m *mockRPCClient) GetBlockByNumber(blockNum string) (*rpc.Response[ethereum.Block], error) {
+	if blockNum != m.blockNum {
+		return nil, fmt.Errorf("mock expects block number %s, got %s", m.blockNum, blockNum)
+	}
+
+	return m.blockInfo, nil
 }
 
 func (m *mockRPCClient) GetCurrentBlockNumber() (*rpc.Response[string], error) {
