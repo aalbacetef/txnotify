@@ -27,6 +27,7 @@ func TestWatcher(t *testing.T) {
 			pollInterval: 5 * time.Second,
 			rpcClient:    mock,
 			logger:       slog.New(slog.NewTextHandler(nopWriter{}, nil)),
+			cache:        NewInMemoryCache(),
 		}
 
 		if watcher.latestBlock != "" {
@@ -49,11 +50,21 @@ func TestWatcher(t *testing.T) {
 			pollInterval: 5 * time.Second,
 			rpcClient:    mock,
 			logger:       slog.New(slog.NewTextHandler(nopWriter{}, nil)),
+			notifier:     mockNotifier{},
+			cache:        NewInMemoryCache(),
 		}
 
 		watcher.checkNewBlock()
 		watcher.processNextBlock()
 	})
+}
+
+type mockNotifier struct{}
+
+func (mockNotifier) Notify(address string, txList []ethereum.Transaction) {
+	for _, tx := range txList {
+		fmt.Printf("%s) got tx: %s\n", address, tx.Hash)
+	}
 }
 
 type mockRPCClient struct {
@@ -133,4 +144,12 @@ func (m *mockRPCClient) GetTransactionCountByNumber(blockNum string) (*rpc.Respo
 	}
 
 	return m.txCount, nil
+}
+
+func (m *mockRPCClient) GetTransactionByHash(hash string) (*rpc.Response[ethereum.Transaction], error) {
+	if hash != m.txData.Result.Hash {
+		return nil, fmt.Errorf("mock expects tx hash %s, got %s", m.txData.Result.Hash, hash)
+	}
+
+	return m.txData, nil
 }

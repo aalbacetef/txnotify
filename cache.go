@@ -50,6 +50,18 @@ func (cache *InMemoryCache) AddBlock(blockNum string, block ethereum.Block) erro
 	return nil
 }
 
+func (cache *InMemoryCache) GetBlock(blockNum string) (ethereum.Block, error) {
+	cache.mu.Lock()
+	defer cache.mu.Unlock()
+
+	block, exists := cache.blocks[blockNum]
+	if !exists {
+		return ethereum.Block{}, fmt.Errorf("block with number %s not found", blockNum)
+	}
+
+	return block, nil
+}
+
 func (cache *InMemoryCache) GetBlockProcessed(blockNum string) (bool, error) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
@@ -87,13 +99,21 @@ func (cache *InMemoryCache) AddTx(tx ethereum.Transaction) error {
 	return nil
 }
 
+type TxNotFoundErr struct {
+	hash string
+}
+
+func (e TxNotFoundErr) Error() string {
+	return fmt.Sprintf("transaction with hash %s not found", e.hash)
+}
+
 func (cache *InMemoryCache) GetTx(hash string) (ethereum.Transaction, error) {
 	cache.mu.Lock()
 	defer cache.mu.Unlock()
 
 	tx, exists := cache.transactions[hash]
 	if !exists {
-		return ethereum.Transaction{}, fmt.Errorf("transaction with hash %s not found", hash)
+		return ethereum.Transaction{}, TxNotFoundErr{hash}
 	}
 
 	return tx, nil

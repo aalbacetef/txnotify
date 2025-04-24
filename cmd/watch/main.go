@@ -7,7 +7,16 @@ import (
 	"time"
 
 	"github.com/aalbacetef/txnotify"
+	"github.com/aalbacetef/txnotify/ethereum"
 )
+
+type mockNotifier struct{}
+
+func (mockNotifier) Notify(address string, txList []ethereum.Transaction) {
+	for _, tx := range txList {
+		fmt.Printf("%s) got tx: %s\n", address, tx.Hash)
+	}
+}
 
 func main() {
 	address := ""
@@ -31,7 +40,7 @@ func main() {
 		return
 	}
 
-	watcher, err := txnotify.NewWatcher(rpcEndpoint, interval)
+	watcher, err := txnotify.NewWatcher(rpcEndpoint, interval, mockNotifier{})
 	if err != nil {
 		fmt.Println("error: ", err)
 		return

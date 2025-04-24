@@ -30,3 +30,15 @@ func TestHex(t *testing.T) {
 		}
 	})
 }
+
+func TestNormalizeAddress(t *testing.T) {
+	v := "0x0000000012"
+	w := "0x12"
+
+	normed := normalizeAddress(v)
+	if normed == w {
+		return
+	}
+
+	t.Fatalf("got '%s', want '%s'", normed, w)
+}
