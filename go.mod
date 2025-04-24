@@ -2,4 +2,7 @@ module github.com/aalbacetef/txnotify
 
 go 1.24.0
 
-require golang.org/x/sync v0.13.0
+require (
+	github.com/gorilla/websocket v1.5.3
+	golang.org/x/sync v0.13.0
+)

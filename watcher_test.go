@@ -126,26 +126,6 @@ func (m *mockRPCClient) GetCurrentBlockNumber() (*rpc.Response[string], error) {
 	}, nil
 }
 
-func (m *mockRPCClient) GetTransactionByBlockNumberAndIndex(blockNum, index string) (*rpc.Response[ethereum.Transaction], error) {
-	if blockNum != m.blockNum {
-		return nil, fmt.Errorf("mock expects block number %s, got %s", m.blockNum, blockNum)
-	}
-
-	if index != *m.txData.Result.TransactionIndex {
-		return nil, fmt.Errorf("mock expects index %s, got %s", m.index, *m.txData.Result.TransactionIndex)
-	}
-
-	return m.txData, nil
-}
-
-func (m *mockRPCClient) GetTransactionCountByNumber(blockNum string) (*rpc.Response[string], error) {
-	if blockNum != m.blockNum {
-		return nil, fmt.Errorf("mock expects block number %s, got %s", m.blockNum, blockNum)
-	}
-
-	return m.txCount, nil
-}
-
 func (m *mockRPCClient) GetTransactionByHash(hash string) (*rpc.Response[ethereum.Transaction], error) {
 	if hash != m.txData.Result.Hash {
 		return nil, fmt.Errorf("mock expects tx hash %s, got %s", m.txData.Result.Hash, hash)

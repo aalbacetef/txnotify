@@ -19,9 +19,7 @@ import (
 type RPCClient interface {
 	GetBlockByNumber(blockNum string) (*rpc.Response[ethereum.Block], error)
 	GetCurrentBlockNumber() (*rpc.Response[string], error)
-	GetTransactionByBlockNumberAndIndex(blockNum, index string) (*rpc.Response[ethereum.Transaction], error)
 	GetTransactionByHash(hash string) (*rpc.Response[ethereum.Transaction], error)
-	GetTransactionCountByNumber(blockNum string) (*rpc.Response[string], error)
 }
 
 type Notifier interface {
