@@ -1,4 +1,4 @@
-package main
+package rpc
 
 import (
 	"bytes"
@@ -10,19 +10,19 @@ import (
 	"time"
 )
 
-type RPCClient struct {
+type Client struct {
 	httpClient *http.Client
 	endpoint   string
 }
 
-type RPCClientOptions struct {
+type ClientOptions struct {
 	Endpoint string
 	Timeout  time.Duration
 }
 
 const defaultTimeout = 30 * time.Second
 
-func NewClient(options RPCClientOptions) (*RPCClient, error) {
+func NewClient(options ClientOptions) (*Client, error) {
 	timeout := options.Timeout
 	if timeout == 0 {
 		timeout = defaultTimeout
@@ -32,7 +32,7 @@ func NewClient(options RPCClientOptions) (*RPCClient, error) {
 		return nil, MissingFieldError{"Endpoint"}
 	}
 
-	return &RPCClient{
+	return &Client{
 		httpClient: &http.Client{Timeout: timeout},
 		endpoint:   options.Endpoint,
 	}, nil
@@ -59,7 +59,7 @@ type GetCurrentBlockResponse struct {
 	ID      int    `json:"id"`
 }
 
-func (client *RPCClient) GetCurrentBlock() (int, error) {
+func (client *Client) GetCurrentBlock() (int, error) {
 	id := rand.Intn(100) // AA: to improve
 
 	payload := GetCurrentBlockRequest{
@@ -111,9 +111,19 @@ type GetBlockByNumRequest struct {
 	ID      int    `json:"id"`
 }
 
-type GetBlockByNumResponse struct{}
+// We only care about a few fields
+type GetBlockByNumResponse struct {
+	JSONRPC string `json:"jsonrpc"`
 
-func (client *RPCClient) GetBlockByNumber(blockNum int) (map[string]any, error) {
+	Result struct {
+		Hash         string   `json:"hash"`
+		Transactions []string `json:"transactions"`
+	} `json:"result"`
+
+	ID int `json:"id"`
+}
+
+func (client *Client) GetBlockByNumber(blockNum int) (*GetBlockByNumResponse, error) {
 	id := rand.Intn(100) // AA: to improve
 
 	payload := GetBlockByNumRequest{
@@ -143,11 +153,11 @@ func (client *RPCClient) GetBlockByNumber(blockNum int) (map[string]any, error) 
 
 	defer resp.Body.Close()
 
-	respBody := make(map[string]any)
+	respBody := GetBlockByNumResponse{}
 
 	if err := json.NewDecoder(resp.Body).Decode(&respBody); err != nil {
 		return nil, fmt.Errorf("could not decode response body: %w", err)
 	}
 
-	return respBody, nil
+	return &respBody, nil
 }
