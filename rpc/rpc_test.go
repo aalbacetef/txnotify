@@ -10,13 +10,12 @@ const testEndpoint = "https://eth.nodeconnect.org"
 func TestCurrentBlock(t *testing.T) {
 	client := mustMakeClient(t, testEndpoint)
 
-	v, err := client.GetCurrentBlock()
+	response, err := client.GetCurrentBlock()
 	if err != nil {
 		t.Fatalf("could not get block: %v", err)
 	}
 
-	t.Logf("block num: %#0x", v)
-
+	t.Logf("block num: %s", response.Result)
 }
 
 func TestGetBlockInfo(t *testing.T) {
