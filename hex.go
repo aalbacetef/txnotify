@@ -21,3 +21,7 @@ func strToHex(s string) (int, error) {
 
 	return int(v), nil
 }
+
+func numToStr(v int) string {
+	return fmt.Sprintf("%#0x", v)
+}

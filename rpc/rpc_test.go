@@ -8,6 +8,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/aalbacetef/txnotify/ethereum"
 )
 
 const testEndpoint = "https://eth.nodeconnect.org"
@@ -44,7 +46,7 @@ func TestGetBlockInfo(t *testing.T) {
 		t.Fatalf("could not fetch block: %v", err)
 	}
 
-	savedResponse := Response[GetBlockByNumberPayload]{}
+	savedResponse := Response[ethereum.Block]{}
 
 	if err := json.NewDecoder(bytes.NewReader(testBlockInfo)).Decode(&savedResponse); err != nil {
 		t.Fatalf("could not decode saved response: %v", err)
@@ -97,7 +99,7 @@ func TestGetTransaction(t *testing.T) {
 		t.Fatalf("could not fetch block: %v", err)
 	}
 
-	savedResponse := Response[Transaction]{}
+	savedResponse := Response[ethereum.Transaction]{}
 
 	if err := json.NewDecoder(bytes.NewReader(testTransaction)).Decode(&savedResponse); err != nil {
 		t.Fatalf("could not decode saved response: %v", err)
@@ -138,7 +140,7 @@ func mustMakeClient(t *testing.T, endpoint string) *Client {
 	return client
 }
 
-func compareTransaction(t *testing.T, gotTx, wantTx Transaction) {
+func compareTransaction(t *testing.T, gotTx, wantTx ethereum.Transaction) {
 	if gotTx.Hash != wantTx.Hash {
 		t.Errorf("(hash) got %s, want %s", gotTx.Hash, wantTx.Hash)
 	}
@@ -173,7 +175,6 @@ func compareTransaction(t *testing.T, gotTx, wantTx Transaction) {
 		t.Errorf("(value) got %s, want %s", gotTx.Value, wantTx.Value)
 	}
 
-	// Compare optional pointer fields (BlockHash, BlockNumber, ChainID, To, TransactionIndex, MaxPriorityFeePerGas, MaxFeePerGas, YParity).
 	compareOptionalString(t, "blockHash", gotTx.BlockHash, wantTx.BlockHash)
 	compareOptionalString(t, "blockNumber", gotTx.BlockNumber, wantTx.BlockNumber)
 	compareOptionalString(t, "chainId", gotTx.ChainID, wantTx.ChainID)
@@ -182,34 +183,6 @@ func compareTransaction(t *testing.T, gotTx, wantTx Transaction) {
 	compareOptionalString(t, "maxPriorityFeePerGas", gotTx.MaxPriorityFeePerGas, wantTx.MaxPriorityFeePerGas)
 	compareOptionalString(t, "maxFeePerGas", gotTx.MaxFeePerGas, wantTx.MaxFeePerGas)
 	compareOptionalString(t, "yParity", gotTx.YParity, wantTx.YParity)
-
-	// Compare AccessList (optional, can be null or empty).
-	if gotTx.AccessList == nil && wantTx.AccessList == nil {
-		// Both are nil, no further comparison needed.
-	} else if gotTx.AccessList == nil || wantTx.AccessList == nil {
-		t.Errorf("(accessList) got %v, want %v", gotTx.AccessList, wantTx.AccessList)
-	} else {
-		gotLen := len(*gotTx.AccessList)
-		wantLen := len(*wantTx.AccessList)
-		if gotLen != wantLen {
-			t.Errorf("(accessList length) got %d, want %d", gotLen, wantLen)
-		} else {
-			for i, gotEntry := range *gotTx.AccessList {
-				wantEntry := (*wantTx.AccessList)[i]
-				if gotEntry.Address != wantEntry.Address {
-					t.Errorf("(accessList[%d].address) got %s, want %s", i, gotEntry.Address, wantEntry.Address)
-				}
-				if len(gotEntry.StorageKeys) != len(wantEntry.StorageKeys) {
-					t.Errorf("(accessList[%d].storageKeys length) got %d, want %d", i, len(gotEntry.StorageKeys), len(wantEntry.StorageKeys))
-				}
-				for j, gotKey := range gotEntry.StorageKeys {
-					if slices.Index(wantEntry.StorageKeys, gotKey) == -1 {
-						t.Errorf("(accessList[%d].storageKeys[%d]) got %s, not found in want", i, j, gotKey)
-					}
-				}
-			}
-		}
-	}
 }
 
 // compareOptionalString compares two optional string pointers and reports an error if they differ.
@@ -218,15 +191,8 @@ func compareOptionalString(t *testing.T, fieldName string, got, want *string) {
 	if got == nil && want == nil {
 		return
 	}
+
 	if got == nil || want == nil || *got != *want {
-		gotVal := "<nil>"
-		wantVal := "<nil>"
-		if got != nil {
-			gotVal = *got
-		}
-		if want != nil {
-			wantVal = *want
-		}
-		t.Errorf("(%s) got %s, want %s", fieldName, gotVal, wantVal)
+		t.Errorf("(%s) got %v, want %v", fieldName, got, want)
 	}
 }

@@ -1,4 +1,4 @@
-package rpc
+package ethereum
 
 // Transaction represents a JSON-RPC transaction object as per the Ethereum JSON-RPC specification.
 type Transaction struct {

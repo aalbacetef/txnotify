@@ -1,0 +1,122 @@
+package txnotify
+
+import (
+	"bytes"
+	"context"
+	_ "embed"
+	"encoding/json"
+	"fmt"
+	"log/slog"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/aalbacetef/txnotify/ethereum"
+	"github.com/aalbacetef/txnotify/rpc"
+)
+
+type nopWriter struct{}
+
+func (nopWriter) Write(v []byte) (int, error) {
+	return len(v), nil
+}
+
+func TestWatcher(t *testing.T) {
+	mock := mustCreateMockClient(t)
+
+	t.Run("it updates the latest block", func(tt *testing.T) {
+		watcher := &Watcher{
+			pollInterval: 5 * time.Second,
+			rpcClient:    mock,
+			logger:       slog.New(slog.NewTextHandler(nopWriter{}, nil)),
+		}
+
+		if watcher.latestBlock != "" {
+			tt.Fatalf("latestBlock should not be set")
+		}
+
+		watcher.checkNewBlock()
+
+		if watcher.latestBlock != mock.blockNum {
+			tt.Fatalf("got %s, want %s", watcher.latestBlock, mock.blockNum)
+		}
+
+		if watcher.currentBlock != "" {
+			tt.Fatalf("watcher.currentBlock should not be updated")
+		}
+	})
+
+	t.Run("it processes the next block", func(tt *testing.T) {
+		watcher := &Watcher{
+			pollInterval: 5 * time.Second,
+			rpcClient:    mock,
+			logger:       slog.New(slog.NewTextHandler(nopWriter{}, nil)),
+		}
+
+		watcher.checkNewBlock()
+
+		watcher.processNextBlock()
+	})
+}
+
+type mockRPCClient struct {
+	blockNum string
+	index    string
+	txCount  *rpc.Response[string]
+	txData   *rpc.Response[ethereum.Transaction]
+}
+
+//go:embed rpc/testdata/tx-count.0x154d535.json
+var testTxCountFile []byte
+
+//go:embed rpc/testdata/tx.0x154d535.0x1.json
+var testTxDataFile []byte
+
+func mustCreateMockClient(t *testing.T) *mockRPCClient {
+	t.Helper()
+
+	mock := &mockRPCClient{
+		blockNum: "0x154d535",
+		index:    "0x1",
+		txCount:  &rpc.Response[string]{},
+		txData:   &rpc.Response[ethereum.Transaction]{},
+	}
+
+	if err := json.NewDecoder(bytes.NewReader(testTxCountFile)).Decode(mock.txCount); err != nil {
+		t.Fatalf("error decoding tx count file: %v", err)
+	}
+
+	if err := json.NewDecoder(bytes.NewReader(testTxDataFile)).Decode(mock.txData); err != nil {
+		t.Fatalf("error decoding tx data file: %v", err)
+	}
+
+	return mock
+}
+
+func (m *mockRPCClient) GetCurrentBlockNumber() (*rpc.Response[string], error) {
+	return &rpc.Response[string]{
+		ID:      1,
+		JSONRPC: "2.0",
+		Result:  m.blockNum,
+	}, nil
+}
+
+func (m *mockRPCClient) GetTransactionByBlockNumberAndIndex(blockNum, index string) (*rpc.Response[ethereum.Transaction], error) {
+	if blockNum != m.blockNum {
+		return nil, fmt.Errorf("mock expects block number %s, got %s", m.blockNum, blockNum)
+	}
+
+	if index != *m.txData.Result.TransactionIndex {
+		return nil, fmt.Errorf("mock expects index %s, got %s", m.index, *m.txData.Result.TransactionIndex)
+	}
+
+	return m.txData, nil
+}
+
+func (m *mockRPCClient) GetTransactionCountByNumber(blockNum string) (*rpc.Response[string], error) {
+	if blockNum != m.blockNum {
+		return nil, fmt.Errorf("mock expects block number %s, got %s", m.blockNum, blockNum)
+	}
+
+	return m.txCount, nil
+}
