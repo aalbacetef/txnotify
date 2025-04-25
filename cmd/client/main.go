@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aalbacetef/txnotify/ethereum"
@@ -51,8 +52,15 @@ func main() {
 	}
 	defer conn.Close()
 
+	seenTxs := make(map[string]map[string]struct{})
+	var mu sync.Mutex
+
 	addrList := splitAddresses(addresses)
 	for _, addr := range addrList {
+		mu.Lock()
+		seenTxs[addr] = make(map[string]struct{})
+		mu.Unlock()
+
 		req := SubscriptionRequest{Address: addr}
 		data, err := json.Marshal(req)
 		if err != nil {
@@ -84,9 +92,18 @@ func main() {
 				continue
 			}
 
-			for _, tx := range notif.Txs {
-				fmt.Printf("%s) got tx: %s\n", notif.Address, tx.Hash)
+			mu.Lock()
+			if _, exists := seenTxs[notif.Address]; !exists {
+				seenTxs[notif.Address] = make(map[string]struct{})
 			}
+
+			for _, tx := range notif.Txs {
+				if _, seen := seenTxs[notif.Address][tx.Hash]; !seen {
+					fmt.Printf("%s) got tx: %s\n", notif.Address, tx.Hash)
+					seenTxs[notif.Address][tx.Hash] = struct{}{}
+				}
+			}
+			mu.Unlock()
 		}
 	}
 }
