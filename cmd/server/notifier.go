@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"log"
 
-	"github.com/aalbacetef/txnotify/ethereum"
 	"github.com/gorilla/websocket"
+
+	"github.com/aalbacetef/txnotify/ethereum"
 )
 
 type WebsocketNotifier struct {
@@ -17,11 +19,15 @@ func (n *WebsocketNotifier) Notify(address string, txList []ethereum.Transaction
 	defer n.server.mu.Unlock()
 
 	notification := Notification{Address: address, Txs: txList}
-	data, err := json.Marshal(notification)
-	if err != nil {
+
+	buf := &bytes.Buffer{}
+
+	if err := json.NewEncoder(buf).Encode(notification); err != nil {
 		log.Printf("marshal error: %v", err)
 		return
 	}
+
+	data := buf.Bytes()
 
 	for conn, subs := range n.server.conns {
 		if _, ok := subs[address]; ok {

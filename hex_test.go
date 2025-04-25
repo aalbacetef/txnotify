@@ -6,7 +6,6 @@ import (
 )
 
 func TestHex(t *testing.T) {
-
 	t.Run("it correctly parses a 0x prefixed hex string", func(tt *testing.T) {
 		const testStr = "0x1692"
 		const want = 0x1692
@@ -33,12 +32,12 @@ func TestHex(t *testing.T) {
 
 func TestNormalizeAddress(t *testing.T) {
 	v := "0x0000000012"
-	w := "0x12"
+	want := "0x12"
 
 	normed := normalizeAddress(v)
-	if normed == w {
+	if normed == want {
 		return
 	}
 
-	t.Fatalf("got '%s', want '%s'", normed, w)
+	t.Fatalf("got '%s', want '%s'", normed, want)
 }

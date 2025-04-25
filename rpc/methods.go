@@ -16,7 +16,8 @@ func (client *Client) GetCurrentBlockNumber() (*Response[string], error) {
 	return Do[string](client, endpoint, []any{})
 }
 
-// GetBlockByNumber will return block information (hash and transaction hashes) given the block's number as a hex-string.
+// GetBlockByNumber will return block information (hash and transaction hashes) given
+// the block's number as a hex-string.
 func (client *Client) GetBlockByNumber(blockNum string) (*Response[ethereum.Block], error) {
 	endpoint := getBlockByNumberEndpoint
 
@@ -30,7 +31,8 @@ func (client *Client) GetBlockByNumber(blockNum string) (*Response[ethereum.Bloc
 	return Do[ethereum.Block](client, endpoint, params)
 }
 
-// GetTransactionCountByNumber will fetch the transaction count for a block. Result is a hex-string corresponding to the transaction count. It expects the blockNum to be a hex-string.
+// GetTransactionCountByNumber will fetch the transaction count for a block. Result is a
+// hex-string corresponding to the transaction count. It expects the blockNum to be a hex-string.
 func (client *Client) GetTransactionCountByNumber(blockNum string) (*Response[string], error) {
 	endpoint := getTransactionCountByNumberEndpoint
 	params := []any{blockNum}
@@ -38,8 +40,9 @@ func (client *Client) GetTransactionCountByNumber(blockNum string) (*Response[st
 	return Do[string](client, endpoint, params)
 }
 
-// GetTransactionByBlockNumberAndIndex will fetch the transaction corresponding to the given block and index. It expects both inputs to be hex strings.
-func (client *Client) GetTransactionByBlockNumberAndIndex(blockNum, index string) (*Response[ethereum.Transaction], error) {
+// GetTransactionByBlockNumberAndIndex will fetch the transaction corresponding to the given
+// block and index. It expects both inputs to be hex strings.
+func (client *Client) GetTransactionByBlockNumberAndIndex(blockNum, index string) (*Response[ethereum.Transaction], error) { //nolint:lll
 	endpoint := getTransactionByBlockNumberAndIndexEndpoint
 
 	params := []any{blockNum, index}

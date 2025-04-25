@@ -99,11 +99,11 @@ func (cache *InMemoryCache) AddTx(tx ethereum.Transaction) error {
 	return nil
 }
 
-type TxNotFoundErr struct {
+type TxNotFoundError struct {
 	hash string
 }
 
-func (e TxNotFoundErr) Error() string {
+func (e TxNotFoundError) Error() string {
 	return fmt.Sprintf("transaction with hash %s not found", e.hash)
 }
 
@@ -113,7 +113,7 @@ func (cache *InMemoryCache) GetTx(hash string) (ethereum.Transaction, error) {
 
 	tx, exists := cache.transactions[hash]
 	if !exists {
-		return ethereum.Transaction{}, TxNotFoundErr{hash}
+		return ethereum.Transaction{}, TxNotFoundError{hash}
 	}
 
 	return tx, nil
@@ -158,6 +158,6 @@ func (cache *InMemoryCache) Unsubscribe(address string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("address %s not subscribed", address)
 
+	return fmt.Errorf("address %s not subscribed", address)
 }

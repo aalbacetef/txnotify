@@ -1,9 +1,15 @@
 
 
+tidy:
+	go mod tidy 
 
-
-fmt:
+fmt: tidy 
 	goimports -w .
 
-test:
+lint: fmt
+	golangci-lint run 
+
+test: fmt
 	go test -v ./...
+
+

@@ -11,7 +11,7 @@ output:
 linters-settings:
   cyclop:
     max-complexity: 20
-    package-average: 5
+    package-average: 6
     skip-tests: true
 
   depguard:
@@ -84,7 +84,7 @@ linters-settings:
     ignore-tests: true 
     match-constant: true 
    
-  # TODO: consider exanding the amount of checks
+  # TODO: consider expanding the amount of checks
   gocritic: 
     disable-all: true
     enabled-checks:
@@ -126,7 +126,7 @@ linters-settings:
     skip-single-param: true
 
   interfacebloat:
-    max: 5
+    max: 9
  
   ireturn:
     allow: 
@@ -164,7 +164,6 @@ linters-settings:
   tagliatelle:
     case:
       rules:
-        json: kebab
         yaml: kebab
 
       use-field-name: true
@@ -201,6 +200,9 @@ linters-settings:
       - wc io.WriteCloser
       - w http.ResponseWriter
       - req *http.Request
+      - mu sync.Mutex
+      - tx ethereum.Transaction
+      - id int
 
 
 

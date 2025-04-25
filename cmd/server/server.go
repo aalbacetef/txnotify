@@ -3,21 +3,26 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
 	"time"
 
+	"github.com/gorilla/websocket"
+
 	"github.com/aalbacetef/txnotify"
 	"github.com/aalbacetef/txnotify/ethereum"
-	"github.com/gorilla/websocket"
 )
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin:     func(r *http.Request) bool { return true },
-}
+const (
+	defaultBufSize      = 1024
+	defaultReadTimeout  = 10 * time.Second
+	defaultWriteTimeout = 10 * time.Second
+	// NOTE: this should probably be lower with clients sending keep alive messages.
+	defaultIdleTimeout       = 5 * time.Minute
+	defaultReadHeaderTimeout = 5 * time.Second
+)
 
 type Server struct {
 	mu           sync.Mutex
@@ -26,6 +31,7 @@ type Server struct {
 	addr         string
 	rpcEndpoint  string
 	pollInterval time.Duration
+	upgrader     websocket.Upgrader
 }
 
 type SubscriptionRequest struct {
@@ -34,19 +40,25 @@ type SubscriptionRequest struct {
 
 type Notification struct {
 	Address string                 `json:"address"`
-	Txs     []ethereum.Transaction `json:"transactions"`
+	Txs     []ethereum.Transaction `json:"transactions"` //nolint:tagliatelle
 }
 
 func NewServer(addr, rpcEndpoint, pollInterval string) (*Server, error) {
 	interval, err := time.ParseDuration(pollInterval)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not parse duration: %w", err)
 	}
+
 	return &Server{
 		conns:        make(map[*websocket.Conn]map[string]struct{}),
 		addr:         addr,
 		rpcEndpoint:  rpcEndpoint,
 		pollInterval: interval,
+		upgrader: websocket.Upgrader{
+			ReadBufferSize:  defaultBufSize,
+			WriteBufferSize: defaultBufSize,
+			CheckOrigin:     func(_ *http.Request) bool { return true },
+		},
 	}, nil
 }
 
@@ -54,7 +66,7 @@ func (s *Server) Start(ctx context.Context) error {
 	notifier := &WebsocketNotifier{server: s}
 	watcher, err := txnotify.NewWatcher(s.rpcEndpoint, s.pollInterval, notifier)
 	if err != nil {
-		return err
+		return fmt.Errorf("NewWatcher: %w", err)
 	}
 	s.watcher = watcher
 	defer s.watcher.Close()
@@ -65,12 +77,27 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 	}()
 
-	http.HandleFunc("/ws", s.handleWebSocket)
-	return http.ListenAndServe(s.addr, nil)
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", s.handleWebSocket)
+
+	srv := &http.Server{
+		Addr:              s.addr,
+		Handler:           mux,
+		ReadTimeout:       defaultReadTimeout,
+		WriteTimeout:      defaultWriteTimeout,
+		IdleTimeout:       defaultIdleTimeout,
+		ReadHeaderTimeout: defaultReadHeaderTimeout,
+	}
+
+	if err := srv.ListenAndServe(); err != nil {
+		return fmt.Errorf("ListenAndServe: %w", err)
+	}
+
+	return nil
 }
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
+	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("upgrade error: %v", err)
 		return

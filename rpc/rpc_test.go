@@ -12,7 +12,10 @@ import (
 	"github.com/aalbacetef/txnotify/ethereum"
 )
 
-const testEndpoint = "https://eth.nodeconnect.org"
+const (
+	testEndpoint    = "https://eth.nodeconnect.org"
+	testBlockNumber = "0x154d535"
+)
 
 //go:embed testdata/block.0x154d535.json
 var testBlockInfo []byte
@@ -22,8 +25,6 @@ var testTransactionCount []byte
 
 //go:embed testdata/tx.0x154d535.0x1.json
 var testTransaction []byte
-
-var testBlockNumber = "0x154d535"
 
 func TestCurrentBlock(t *testing.T) {
 	client := mustMakeClient(t, testEndpoint)
@@ -146,7 +147,7 @@ func TestInvalidMethod(t *testing.T) {
 	}
 }
 
-func mustMakeClient(t *testing.T, endpoint string) *Client {
+func mustMakeClient(t *testing.T, endpoint string) *Client { //nolint:unparam
 	t.Helper()
 
 	client, err := NewClient(ClientOptions{Endpoint: endpoint})
@@ -158,6 +159,8 @@ func mustMakeClient(t *testing.T, endpoint string) *Client {
 }
 
 func compareTransaction(t *testing.T, gotTx, wantTx ethereum.Transaction) {
+	t.Helper()
+
 	if gotTx.Hash != wantTx.Hash {
 		t.Errorf("(hash) got %s, want %s", gotTx.Hash, wantTx.Hash)
 	}

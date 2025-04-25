@@ -25,3 +25,19 @@ func strToHex(s string) (int, error) {
 func numToStr(v int) string {
 	return fmt.Sprintf("%#0x", v)
 }
+
+func normalizeAddress(s string) string {
+	pfx := "0x"
+	addr := strings.TrimPrefix(s, pfx)
+
+	for {
+		w := strings.TrimPrefix(addr, "0")
+		if addr == w {
+			break
+		}
+
+		addr = w
+	}
+
+	return pfx + addr
+}

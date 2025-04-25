@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -26,6 +25,7 @@ type Notifier interface {
 	Notify(address string, txList []ethereum.Transaction)
 }
 
+// NewWatcher initializes a new Watcher instance with a JSON-RPC client, logger, in-memory cache, and notifier.
 func NewWatcher(rpcEndpoint string, pollInterval time.Duration, notifier Notifier) (*Watcher, error) {
 	client, err := rpc.NewClient(rpc.ClientOptions{
 		Endpoint: rpcEndpoint,
@@ -70,6 +70,7 @@ func (watcher *Watcher) Close() error {
 	return nil
 }
 
+// Subscribe registers a new address for monitoring by normalizing and adding it to the subscription list.
 func (watcher *Watcher) Subscribe(address string) error {
 	watcher.mu.Lock()
 	defer watcher.mu.Unlock()
@@ -79,6 +80,7 @@ func (watcher *Watcher) Subscribe(address string) error {
 	return nil
 }
 
+// Listen starts the polling loop to watch for new Ethereum blocks and process transactions in real-time.
 func (watcher *Watcher) Listen(backgroundCtx context.Context) error {
 	ctx, cancel := context.WithCancel(backgroundCtx)
 
@@ -97,7 +99,7 @@ func (watcher *Watcher) Listen(backgroundCtx context.Context) error {
 	}
 }
 
-// checkNewBlock will
+// checkNewBlock will fetch the latest block number, skipping if there are no new ones.
 func (watcher *Watcher) checkNewBlock() {
 	resp, err := watcher.rpcClient.GetCurrentBlockNumber()
 	if err != nil {
@@ -125,9 +127,11 @@ func (watcher *Watcher) checkNewBlock() {
 	watcher.latestBlock = blockNumber
 }
 
+// processNextBlock determines the next block to process, fetches its transactions, updates cache,
+// and triggers notifications.
 // @TODO: handle case where block still has pending tx
 // assumes: block number increases incrementally and linearly.
-func (watcher *Watcher) processNextBlock() {
+func (watcher *Watcher) processNextBlock() { //nolint:funlen
 	state := watcher.copyState()
 
 	// @TODO: update in case new subs came in
@@ -152,7 +156,6 @@ func (watcher *Watcher) processNextBlock() {
 	watcher.logger.Info("processing next block", "nextBlockNum", nextBlockNum)
 
 	// @TODO: check if block as been processed
-
 	// @TODO: check cache for block info, so no need to refetch
 
 	blockInfoResp, err := watcher.rpcClient.GetBlockByNumber(nextBlockNum)
@@ -181,7 +184,7 @@ func (watcher *Watcher) processNextBlock() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	g, _ := errgroup.WithContext(ctx)
+	grp, _ := errgroup.WithContext(ctx)
 
 	for k, _txHash := range blockInfoResp.Result.Transactions {
 		if k%batchSize == 0 {
@@ -190,12 +193,12 @@ func (watcher *Watcher) processNextBlock() {
 
 		txHash := _txHash
 
-		g.Go(func() error {
+		grp.Go(func() error {
 			return watcher.fetchTxIfNotExist(txHash)
 		})
 	}
 
-	if err := g.Wait(); err != nil {
+	if err := grp.Wait(); err != nil {
 		watcher.logger.Info(
 			"fetching transactions failed, block will be reprocessed",
 			"blockNum", nextBlockNum,
@@ -231,6 +234,7 @@ type State struct {
 	latestBlock  string
 }
 
+// copyState returns a snapshot of the current block state and subscriptions for safe concurrent access.
 func (watcher *Watcher) copyState() State {
 	watcher.mu.Lock()
 	defer watcher.mu.Unlock()
@@ -245,6 +249,7 @@ func (watcher *Watcher) copyState() State {
 	}
 }
 
+// fetchTxIfNotExist checks if a transaction is already cached, and fetches it from the blockchain if not.
 func (watcher *Watcher) fetchTxIfNotExist(txHash string) error {
 	_, err := watcher.cache.GetTx(txHash)
 	if err == nil {
@@ -252,7 +257,7 @@ func (watcher *Watcher) fetchTxIfNotExist(txHash string) error {
 		return nil
 	}
 
-	if !errors.Is(err, TxNotFoundErr{txHash}) {
+	if !errors.Is(err, TxNotFoundError{txHash}) {
 		return fmt.Errorf("error fetching tx (hash=%s): %w", txHash, err)
 	}
 
@@ -268,6 +273,7 @@ func (watcher *Watcher) fetchTxIfNotExist(txHash string) error {
 	return nil
 }
 
+// notifyForBlock filters transactions involving subscribed addresses and invokes the notifier for each address.
 func (watcher *Watcher) notifyForBlock(blockNum string, subs []string) {
 	txxMap := make(map[string][]ethereum.Transaction, len(subs))
 
@@ -281,7 +287,9 @@ func (watcher *Watcher) notifyForBlock(blockNum string, subs []string) {
 		tx, err := watcher.cache.GetTx(txHash)
 		if err != nil {
 			watcher.logger.Error("cache.GetTx failed", "txHash", txHash, "error", err)
-			continue // NOTE: we skip, but a future improvement would be to reprocess, but it's hard to reach tx not found here and rather have cache errors/bugs
+			// NOTE: we skip, but a future improvement would be to reprocess
+			// though it's hard to reach tx not found here, instead you'd have cache errors/bugs
+			continue
 		}
 
 		from := normalizeAddress(tx.From)
@@ -303,20 +311,4 @@ func (watcher *Watcher) notifyForBlock(blockNum string, subs []string) {
 	for _, addr := range subs {
 		go watcher.notifier.Notify(addr, txxMap[addr])
 	}
-}
-
-func normalizeAddress(s string) string {
-	pfx1 := "0x"
-	v := strings.TrimPrefix(s, pfx1)
-
-	for {
-		w := strings.TrimPrefix(v, "0")
-		if v == w {
-			break
-		}
-
-		v = w
-	}
-
-	return pfx1 + v
 }

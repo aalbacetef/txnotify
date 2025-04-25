@@ -15,7 +15,11 @@ type Client struct {
 }
 
 func (client *Client) generateID() int {
-	id := rand.Intn(100) // AA: to improve
+	const idRange = 100
+
+	// AA: to improve with stronger randomness
+	id := rand.Intn(idRange) //nolint:gosec
+
 	return id
 }
 
