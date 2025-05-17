@@ -1,4 +1,5 @@
 import type { Transaction } from "./tx";
+import type { Settings } from "./wasm";
 
 export type GenericMessage = {
   type: MessageType;
@@ -8,15 +9,16 @@ export type GenericMessage = {
 export enum Event {
   WorkerLoaded = 'worker-loaded',
   WASMLoaded = 'wasm-loaded',
-  TxReceived = 'tx-received',
 }
 
 export enum MessageType {
   WorkerEvent = 'worker-event',
   LoadWASM = 'load-wasm',
   Subscribe = "subscribe",
-  TxReceived = 'tx-received',
-}
+  TxNotification = 'tx-received',
+  UpdateSettings = 'update-settings',
+  StartWatcher = 'start-watcher',
+};
 
 export type WorkerEvent = {
   type: MessageType.WorkerEvent;
@@ -39,9 +41,19 @@ export type Subscribe = {
   };
 }
 
-export type TxReceived = {
-  type: MessageType.TxReceived;
+export type TxNotification = {
+  type: MessageType.TxNotification;
   data: {
     tx: Transaction;
   }
+}
+
+export type UpdateSettings = {
+  type: MessageType.UpdateSettings;
+  data: Settings;
+}
+
+export type StartWatcher = {
+  type: MessageType.StartWatcher;
+  data: null;
 }

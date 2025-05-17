@@ -2,7 +2,9 @@ import {
   MessageType,
   Event,
   type Subscribe,
-  type TxReceived,
+  type TxNotification,
+  type UpdateSettings,
+  type StartWatcher,
 } from '@/lib/messages';
 
 import {
@@ -10,13 +12,21 @@ import {
   type LoadWASM,
   type WorkerEvent,
 } from '@/lib/messages';
+import type { Transaction } from './tx';
 
 
 type StateChangeCB = (state: Event) => void;
+type Settings = {
+  rpcEndpoint: string;
+}
+
+type Store = {
+  addTx(tx: Transaction): void;
+}
 
 // WorkerPeer provides a set of methods to interact with the Worker.
 export class WorkerPeer {
-  store = null;
+  store: Store | null = null;
   worker: Worker;
   callbacks: {
     [key in Event]?: StateChangeCB[];
@@ -31,7 +41,7 @@ export class WorkerPeer {
     this.worker.addEventListener('message', (msg) => this.handleMessage(msg.data));
   }
 
-  setStore(store) {
+  setStore(store: Store) {
     this.store = store;
   }
 
@@ -42,7 +52,6 @@ export class WorkerPeer {
     });
   }
 
-
   subscribe(address: string): void {
     this.postMessage<Subscribe>({
       type: MessageType.Subscribe,
@@ -50,13 +59,66 @@ export class WorkerPeer {
     });
   }
 
-  postMessage<T>(msg: T): void {
-    this.worker.postMessage(msg);
+  start(): void {
+    this.postMessage<StartWatcher>({
+      type: MessageType.StartWatcher,
+      data: null,
+    });
   }
+
+  updateSettings(settings: Settings): void {
+    this.postMessage<UpdateSettings>({
+      type: MessageType.UpdateSettings,
+      data: settings,
+    });
+  }
+
 
   handleWorkerStateChange(msg: WorkerEvent): void {
     console.log('[handleWorkerStateChange] msg:', msg);
     this.runCallbacks(msg.data.state);
+  }
+
+  handleMessage(msg: GenericMessage): void {
+    switch (msg.type) {
+      case MessageType.WorkerEvent:
+        return this.handleWorkerStateChange(msg as WorkerEvent);
+
+      case MessageType.TxNotification:
+        return this.handleTxReceived(msg as TxNotification);
+
+      default:
+        console.log('unknown msg type:', msg.type);
+        console.log(msg);
+    }
+  }
+
+  handleTxReceived(msg: TxNotification): void {
+    const { tx } = msg.data;
+    if (this.store === null) {
+      return;
+    }
+
+    this.store.addTx(tx);
+  }
+
+  on(state: Event, cb: StateChangeCB, once: boolean = false) {
+    let target = this.callbacks;
+    if (once) {
+      target = this.oneoffs;
+    }
+
+    if (typeof target[state] === 'undefined') {
+      target[state] = [cb];
+      return;
+    }
+
+    target[state]!.push(cb);
+  }
+
+
+  postMessage<T>(msg: T): void {
+    this.worker.postMessage(msg);
   }
 
   runCallbacks(state: Event) {
@@ -74,38 +136,5 @@ export class WorkerPeer {
 
     this.oneoffs[state]!.forEach((cb) => cb(state));
     this.oneoffs[state] = [];
-  }
-
-  handleMessage(msg: GenericMessage): void {
-    switch (msg.type) {
-      case MessageType.WorkerEvent:
-        return this.handleWorkerStateChange(msg as WorkerEvent);
-
-      case MessageType.TxReceived:
-        return this.handleTxReceived(msg as TxReceived);
-
-      default:
-        console.log('unknown msg type:', msg.type);
-        console.log(msg);
-    }
-  }
-
-  handleTxReceived(msg: TxReceived): void {
-    const { tx } = msg.data;
-    this.store.addTx(tx);
-  }
-
-  on(state: Event, cb: StateChangeCB, once: boolean = false) {
-    let target = this.callbacks;
-    if (once) {
-      target = this.oneoffs;
-    }
-
-    if (typeof target[state] === 'undefined') {
-      target[state] = [cb];
-      return;
-    }
-
-    target[state]!.push(cb);
   }
 }

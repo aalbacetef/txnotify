@@ -27,3 +27,12 @@ export function serializeStr(s: string): SerializeResult {
 
   return { buf, n: buf.byteLength };
 }
+
+export enum ReturnCode {
+  Ok,
+  Error
+};
+
+export type Settings = {
+  rpcEndpoint: string
+}

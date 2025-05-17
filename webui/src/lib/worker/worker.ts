@@ -3,7 +3,8 @@ import type {
   LoadWASM,
   WorkerEvent,
   Subscribe,
-  TxReceived,
+  UpdateSettings,
+  StartWatcher,
 } from '@/lib/messages';
 import { MessageType, Event } from '@/lib/messages';
 import { loadWASM, serializeStr, type WASMLoadResult } from '@/lib/wasm';
@@ -26,28 +27,19 @@ class WorkerInstance {
     self.WASM_listenNotification = this.handleNotification;
   }
 
-  handleNotification(buf: Uint8Array) {
-    const decoder = new TextDecoder();
-    const s = decoder.decode(buf);
-    const data = JSON.parse(s);
-
-    console.log('data: ', data);
-
-    self.postMessage({
-      type: MessageType.TxReceived,
-      data: { tx: data },
-    });
-  }
-
   handleMessage(msg: GenericMessage) {
-    console.log('got message: ', msg);
-
     switch (msg.type) {
       case MessageType.LoadWASM:
         return this.handleLoadWASM(msg as LoadWASM);
 
       case MessageType.Subscribe:
         return this.handleSubscribe(msg as Subscribe);
+
+      case MessageType.UpdateSettings:
+        return this.handleUpdateSettings(msg as UpdateSettings);
+
+      case MessageType.StartWatcher:
+        return this.handleStartWatcher(msg as StartWatcher);
 
       default:
         console.log('unhandled message: ', msg);
@@ -63,7 +55,29 @@ class WorkerInstance {
 
   handleSubscribe(msg: Subscribe): void {
     const { buf, n } = serializeStr(msg.data.address);
-    self.WASM_subscribe(buf, n);
+    console.log('[wasm subscribe] code: ', self.WASM_subscribe(buf, n));
+  }
+
+  handleNotification(buf: Uint8Array): void {
+    const decoder = new TextDecoder();
+    const s = decoder.decode(buf);
+    const data = JSON.parse(s);
+
+    self.postMessage({
+      type: MessageType.TxNotification,
+      data: { tx: data },
+    });
+  }
+
+  handleUpdateSettings(msg: UpdateSettings): void {
+    const stringified = JSON.stringify(msg.data);
+    const { buf, n } = serializeStr(stringified);
+
+    console.log('[wasm us]: ', self.WASM_updateSettings(buf, n));
+  }
+
+  handleStartWatcher(msg: StartWatcher): void {
+    console.log('[wasm start]: ', self.WASM_start());
   }
 }
 

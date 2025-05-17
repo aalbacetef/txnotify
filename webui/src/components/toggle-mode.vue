@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onMounted } from 'vue';
 import { ref } from 'vue';
 
 enum Mode {
@@ -8,8 +9,21 @@ enum Mode {
 
 const currentMode = ref<Mode>(getCurrentMode());
 
+onMounted(() => {
+  setMode(currentMode.value);
+})
+
 function getCurrentMode(): Mode {
   const defaultMode = Mode.Light;
+
+  const localVal = localStorage.getItem("theme");
+  if (localVal !== null) {
+    switch (localVal) {
+      case Mode.Light:
+      case Mode.Dark:
+        return localVal as Mode;
+    }
+  }
 
   if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
     return Mode.Dark;
@@ -19,15 +33,15 @@ function getCurrentMode(): Mode {
     return Mode.Light;
   }
 
-
   const elem = document.querySelector('html');
   if (elem === null) {
     throw new Error("html element is null");
   }
 
-  const v = elem.getAttribute("data-theme", Mode.Light);
+  const v = elem.getAttribute("data-theme");
   switch (v) {
-    case Mode.Light, Mode.Dark:
+    case Mode.Light:
+    case Mode.Dark:
       return v as Mode;
     default:
       return defaultMode;
@@ -52,6 +66,7 @@ function setMode(mode: Mode): void {
   }
 
   elem.setAttribute("data-theme", mode);
+  localStorage.setItem("theme", mode);
 }
 </script>
 

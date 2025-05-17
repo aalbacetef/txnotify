@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { inject, ref, computed } from 'vue';
 import { WorkerPeer } from '@/lib/peer';
+import { getEndpoints, type Endpoint } from '@/lib/tx';
 
 import { useTransactionStore } from '@/stores/transactions';
 
@@ -8,52 +9,45 @@ const store = useTransactionStore();
 
 import ToggleMode from '@/components/toggle-mode.vue';
 
-type Endpoint = {
-  url: string;
-}
 
 const rpcEndpoint = ref<string>('');
 const ethAddress = ref<string>('0xdAC17F958D2ee523a2206206994597C13D831ec7');
 const endpoints = ref<Endpoint[]>([]);
 const workerPeer = inject<WorkerPeer>('workerPeer');
-workerPeer.setStore(store);
+const customRPCURL = ref<string>('');
+const started = ref<boolean>(false);
+
+workerPeer!.setStore(store);
 
 const transactions = computed(() => store.transactions.toReversed());
 
-// abbreviated version
-type ChainlistDataEntry = {
-  name: string;
-  chain: string;
-  rpc: Endpoint[];
-}
-
 (async function () {
-  const response = await fetch(
-    'https://chainlist.org/rpcs.json',
-    { method: 'GET', mode: 'cors' },
-  );
-  const data = await response.json<ChainlistDataEntry>();
-
-  const mainnet = data.find(
-    elem => elem.name === "Ethereum Mainnet" && elem.chain === "ETH"
-  );
-  if (mainnet === null) {
-    console.error("could not find RPC endpoints");
-    return;
-  }
-
-  endpoints.value = mainnet.rpc.filter(elem => elem.url.startsWith("https://"));
+  endpoints.value = await getEndpoints();
 })();
 
 
+function handleEndpointSelected() {
+  console.log('endpoint selected');
+  if (rpcEndpoint.value === "custom") {
+    return;
+  }
+
+  workerPeer!.updateSettings({ rpcEndpoint: rpcEndpoint.value });
+}
+
 function handleSubscribeClicked() {
   const address = ethAddress.value;
-  console.log('address: ', address);
   if (address.trim() === '') {
     return;
   }
 
-  workerPeer.subscribe(address);
+  workerPeer!.subscribe(address);
+  started.value = true;
+  workerPeer!.start();
+}
+
+function setCustomRPCEndpoint() {
+  workerPeer!.updateSettings({ rpcEndpoint: customRPCURL.value });
 }
 </script>
 
@@ -78,7 +72,7 @@ function handleSubscribeClicked() {
           <label class="label">RPC Endpoint</label>
           <div class="control">
             <div class="select is-fullwidth">
-              <select v-model="rpcEndpoint">
+              <select v-model="rpcEndpoint" @change="handleEndpointSelected">
                 <option value="" disabled>Select an RPC endpoint</option>
                 <option value="custom">Custom</option>
                 <option v-for="endpoint in endpoints" :key="endpoint.url">
@@ -92,12 +86,15 @@ function handleSubscribeClicked() {
         <div class="field" v-if="rpcEndpoint === 'custom'">
           <label class="label">Custom RPC URL</label>
           <div class="control">
-            <input class="input" type="text" placeholder="Enter custom RPC URL" v-model="customRpcUrl" />
+            <input class="input" type="text" placeholder="Enter custom RPC URL" v-model="customRPCURL" />
           </div>
         </div>
 
         <div class="button">
           <button @click="handleSubscribeClicked">Subscribe</button>
+          <button v-if="rpcEndpoint === 'custom'" @click="setCustomRPCEndpoint">
+            Set custom RPC endpoint
+          </button>
         </div>
 
         <div class="transaction-list">
