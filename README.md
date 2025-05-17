@@ -1,10 +1,9 @@
 
-![CI status](https://github.com/aalbacetef/trust-wallet-interview/actions/workflows/ci.yml/badge.svg) ![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg) 
+![CI status](https://github.com/aalbacetef/txnotify/actions/workflows/ci.yml/badge.svg) ![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg) 
 
 # txnotify
 
 `txnotify` is an Ethereum transaction observer that tracks incoming and outgoing transactions for subscribed addresses using Ethereum's JSON-RPC API. It pushes real-time updates to clients via WebSockets, making it suitable for integration with notification systems or wallet UIs.
-
 
 Notes:
  - the core type is the `Watcher` 
