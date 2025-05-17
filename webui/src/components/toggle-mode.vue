@@ -71,13 +71,15 @@ function setMode(mode: Mode): void {
 </script>
 
 <template>
-  <div class="toggle-mode" @click="toggleMode">
+  <button class="button toggle-mode" @click="toggleMode">
     <span>{{ currentMode }}</span>
-  </div>
+  </button>
 </template>
 
 <style scoped>
 .toggle-mode {
   cursor: pointer;
+  width: 150px;
+  padding: 10px 15px !important;
 }
 </style>

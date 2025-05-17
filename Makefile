@@ -13,4 +13,11 @@ test: fmt
 	go test -v ./...
 
 build-wasm:
-	env GOOS=js GOARCH=wasm go build -o txnotify.wasm ./cmd/wasm/ && mv txnotify.wasm webui/public/
+	env GOOS=js GOARCH=wasm go build -o txnotify.wasm ./cmd/wasm/ 
+	mv txnotify.wasm webui/public/
+
+bundle:
+	cd webui && bun x vite build
+
+serve:
+	cd webui && bun  ./dist
