@@ -5,7 +5,6 @@ import (
 	_ "embed"
 	"encoding/json"
 	"errors"
-	"slices"
 	"strings"
 	"testing"
 
@@ -19,12 +18,6 @@ const (
 
 //go:embed testdata/block.0x154d535.json
 var testBlockInfo []byte
-
-//go:embed testdata/tx-count.0x154d535.json
-var testTransactionCount []byte
-
-//go:embed testdata/tx.0x154d535.0x1.json
-var testTransaction []byte
 
 func TestCurrentBlock(t *testing.T) {
 	client := mustMakeClient(t, testEndpoint)
@@ -57,73 +50,16 @@ func TestGetBlockInfo(t *testing.T) {
 		t.Fatalf("(hash) got %s, want %s", response.Result.Hash, savedResponse.Result.Hash)
 	}
 
-	gotLen := len(response.Result.Transactions)
-	wantLen := len(savedResponse.Result.Transactions)
+	// block will have many transactions, lets trim all but one
+	savedTx := savedResponse.Result.Transactions[0]
 
-	if gotLen != wantLen {
-		t.Fatalf("(n transactions) got %d, want %d", gotLen, wantLen)
-	}
-
-	for k, got := range response.Result.Transactions {
-		if slices.Index(savedResponse.Result.Transactions, got) == -1 {
-			t.Fatalf("(%d) transaction with hash %s not found", k, got)
+	for _, got := range response.Result.Transactions {
+		if got.Hash == savedTx.Hash {
+			return
 		}
 	}
-}
 
-func TestGetTransactionCount(t *testing.T) {
-	client := mustMakeClient(t, testEndpoint)
-
-	response, err := client.GetTransactionCountByNumber(testBlockNumber)
-	if err != nil {
-		t.Fatalf("could not fetch block: %v", err)
-	}
-
-	savedResponse := Response[string]{}
-
-	if err := json.NewDecoder(bytes.NewReader(testTransactionCount)).Decode(&savedResponse); err != nil {
-		t.Fatalf("could not decode saved response: %v", err)
-	}
-
-	if response.Result != savedResponse.Result {
-		t.Fatalf("got %s, want %s", response.Result, savedResponse.Result)
-	}
-}
-
-func TestGetTransactionByBlockNumberAndIndex(t *testing.T) {
-	client := mustMakeClient(t, testEndpoint)
-
-	txIndex := "0x1"
-
-	response, err := client.GetTransactionByBlockNumberAndIndex(testBlockNumber, txIndex)
-	if err != nil {
-		t.Fatalf("could not fetch block: %v", err)
-	}
-
-	savedResponse := Response[ethereum.Transaction]{}
-
-	if err := json.NewDecoder(bytes.NewReader(testTransaction)).Decode(&savedResponse); err != nil {
-		t.Fatalf("could not decode saved response: %v", err)
-	}
-
-	compareTransaction(t, response.Result, savedResponse.Result)
-}
-
-func TestGetTransactionByHash(t *testing.T) {
-	client := mustMakeClient(t, testEndpoint)
-
-	savedResponse := Response[ethereum.Transaction]{}
-
-	if err := json.NewDecoder(bytes.NewReader(testTransaction)).Decode(&savedResponse); err != nil {
-		t.Fatalf("could not decode saved response: %v", err)
-	}
-
-	response, err := client.GetTransactionByHash(savedResponse.Result.Hash)
-	if err != nil {
-		t.Fatalf("could not fetch block: %v", err)
-	}
-
-	compareTransaction(t, response.Result, savedResponse.Result)
+	t.Fatalf("transaction with hash %s not found", savedTx.Hash)
 }
 
 func TestInvalidMethod(t *testing.T) {

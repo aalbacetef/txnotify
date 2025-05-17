@@ -49,7 +49,10 @@ func TestWatcher(t *testing.T) { //nolint:gocognit
 		state := watcher.copyState()
 
 		if state.currentBlock != state.latestBlock {
-			tt.Fatalf("currentBlock != latestBlock, cb=%s, lb=%s", state.currentBlock, state.latestBlock)
+			tt.Fatalf(
+				"currentBlock != latestBlock, cb=%s, lb=%s",
+				state.currentBlock, state.latestBlock,
+			)
 		}
 
 		block, err := watcher.cache.GetBlock(watcher.latestBlock)
@@ -79,8 +82,6 @@ func mustMakeWatcher(t *testing.T, mock RPCClient) *Watcher {
 
 	watcher := &Watcher{
 		pollInterval: 5 * time.Second,
-		batchDelay:   defaultBatchDelay,
-		batchSize:    defaultBatchSize,
 		rpcClient:    mock,
 		logger:       slog.New(slog.NewTextHandler(nopWriter{}, nil)),
 		notifier:     mockNotifier{},
@@ -101,16 +102,8 @@ func (mockNotifier) Notify(address string, txList []ethereum.Transaction) {
 type mockRPCClient struct {
 	blockNum  string
 	index     string
-	txCount   *rpc.Response[string]
-	txData    *rpc.Response[ethereum.Transaction]
 	blockInfo *rpc.Response[ethereum.Block]
 }
-
-//go:embed rpc/testdata/tx-count.0x154d535.json
-var testTxCountFile []byte
-
-//go:embed rpc/testdata/tx.0x154d535.0x1.json
-var testTxDataFile []byte
 
 //go:embed rpc/testdata/block.0x154d535.json
 var testBlockInfoFile []byte
@@ -121,27 +114,12 @@ func mustCreateMockClient(t *testing.T) *mockRPCClient {
 	mock := &mockRPCClient{
 		blockNum:  "0x154d535",
 		index:     "0x1",
-		txCount:   &rpc.Response[string]{},
-		txData:    &rpc.Response[ethereum.Transaction]{},
 		blockInfo: &rpc.Response[ethereum.Block]{},
 	}
 
-	if err := json.NewDecoder(bytes.NewReader(testTxCountFile)).Decode(mock.txCount); err != nil {
-		t.Fatalf("error decoding tx count file: %v", err)
-	}
-
-	if err := json.NewDecoder(bytes.NewReader(testTxDataFile)).Decode(mock.txData); err != nil {
-		t.Fatalf("error decoding tx data file: %v", err)
-	}
-
-	if err := json.NewDecoder(bytes.NewReader(testBlockInfoFile)).Decode(mock.blockInfo); err != nil {
+	if err := json.NewDecoder(bytes.NewReader(testBlockInfoFile)).Decode(&mock.blockInfo); err != nil {
 		t.Fatalf("error decoding block info file: %v", err)
 	}
-
-	// NOTE: to ensure the tests pass, we modify the block info to only have one tx
-	wantTxHash := mock.txData.Result
-	txs := []ethereum.Transaction{wantTxHash}
-	mock.blockInfo.Result.Transactions = txs
 
 	return mock
 }
@@ -160,13 +138,4 @@ func (m *mockRPCClient) GetCurrentBlockNumber() (*rpc.Response[string], error) {
 		JSONRPC: "2.0",
 		Result:  m.blockNum,
 	}, nil
-}
-
-func (m *mockRPCClient) GetTransactionByHash(hash string) (*rpc.Response[ethereum.Transaction], error) {
-	// NOTE: mock will return a single tx regardless of hash
-	if hash != m.txData.Result.Hash {
-		return nil, fmt.Errorf("mock expects tx hash %s, got %s", m.txData.Result.Hash, hash)
-	}
-
-	return m.txData, nil
 }

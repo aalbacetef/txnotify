@@ -2,7 +2,6 @@ package txnotify
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -16,7 +15,6 @@ import (
 type RPCClient interface {
 	GetBlockByNumber(blockNum string) (*rpc.Response[ethereum.Block], error)
 	GetCurrentBlockNumber() (*rpc.Response[string], error)
-	GetTransactionByHash(hash string) (*rpc.Response[ethereum.Transaction], error)
 }
 
 type Notifier interface {
@@ -43,20 +41,8 @@ func NewWatcher(rpcEndpoint string, cfg Config, notifier Notifier) (*Watcher, er
 		pollInterval = defaultPollInterval
 	}
 
-	batchSize := cfg.BatchSize
-	if batchSize == 0 {
-		batchSize = defaultBatchSize
-	}
-
-	batchDelay := cfg.BatchDelay
-	if batchDelay == 0 {
-		batchDelay = defaultBatchDelay
-	}
-
 	watcher := &Watcher{
 		pollInterval: pollInterval,
-		batchSize:    batchSize,
-		batchDelay:   batchDelay,
 		rpcClient:    client,
 		logger:       slog.New(slog.NewJSONHandler(os.Stdout, nil)),
 		cache:        NewInMemoryCache(),
@@ -68,8 +54,6 @@ func NewWatcher(rpcEndpoint string, cfg Config, notifier Notifier) (*Watcher, er
 
 const (
 	defaultPollInterval = 15 * time.Second
-	defaultBatchSize    = 35
-	defaultBatchDelay   = 3 * time.Second
 )
 
 type Watcher struct {
@@ -77,8 +61,6 @@ type Watcher struct {
 	subscriptions []string
 	cancel        context.CancelFunc
 	pollInterval  time.Duration
-	batchSize     int
-	batchDelay    time.Duration
 	rpcClient     RPCClient
 	cache         Cache
 	currentBlock  string
@@ -270,30 +252,6 @@ func (watcher *Watcher) fetchBlockInfoIfNotExist(blockNum string) (ethereum.Bloc
 	}
 
 	return blockInfoResp.Result, nil
-}
-
-// fetchTxIfNotExist checks if a transaction is already cached, and fetches it from the blockchain if not.
-func (watcher *Watcher) fetchTxIfNotExist(txHash string) error {
-	_, err := watcher.cache.GetTx(txHash)
-	if err == nil {
-		watcher.logger.Debug("already have tx, skipping", "txHash", txHash)
-		return nil
-	}
-
-	if !errors.Is(err, TxNotFoundError{txHash}) {
-		return fmt.Errorf("error fetching tx (hash=%s): %w", txHash, err)
-	}
-
-	resp, err := watcher.rpcClient.GetTransactionByHash(txHash)
-	if err != nil {
-		return fmt.Errorf("failed to get transaction by hash (hash=%s): %w", txHash, err)
-	}
-
-	if err := watcher.cache.AddTx(resp.Result); err != nil {
-		return fmt.Errorf("could not add tx to cache (hash=%s): %w", txHash, err)
-	}
-
-	return nil
 }
 
 // notifyForBlock filters transactions involving subscribed addresses and invokes the notifier for each address.

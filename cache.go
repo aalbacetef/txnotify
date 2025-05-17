@@ -47,6 +47,10 @@ func (cache *InMemoryCache) AddBlock(blockNum string, block ethereum.Block) erro
 
 	cache.blocks[blockNum] = block
 
+	for _, tx := range block.Transactions {
+		cache.transactions[tx.Hash] = tx
+	}
+
 	return nil
 }
 
