@@ -62,14 +62,14 @@ func TestWatcher(t *testing.T) { //nolint:gocognit
 			tt.Fatalf("should have only one tx, got %d", n)
 		}
 
-		txHash := block.Transactions[0]
-		tx, err := watcher.cache.GetTx(txHash)
+		wantTx := block.Transactions[0]
+		tx, err := watcher.cache.GetTx(wantTx.Hash)
 		if err != nil {
 			tt.Fatalf("error: %v", err)
 		}
 
-		if tx.Hash != txHash {
-			tt.Fatalf("tx hash mismatch: got %s, want %s", tx.Hash, txHash)
+		if tx.Hash != wantTx.Hash {
+			tt.Fatalf("tx hash mismatch: got %s, want %s", tx.Hash, wantTx.Hash)
 		}
 	})
 }
@@ -79,6 +79,8 @@ func mustMakeWatcher(t *testing.T, mock RPCClient) *Watcher {
 
 	watcher := &Watcher{
 		pollInterval: 5 * time.Second,
+		batchDelay:   defaultBatchDelay,
+		batchSize:    defaultBatchSize,
 		rpcClient:    mock,
 		logger:       slog.New(slog.NewTextHandler(nopWriter{}, nil)),
 		notifier:     mockNotifier{},
@@ -137,8 +139,8 @@ func mustCreateMockClient(t *testing.T) *mockRPCClient {
 	}
 
 	// NOTE: to ensure the tests pass, we modify the block info to only have one tx
-	wantTxHash := mock.txData.Result.Hash
-	txs := []string{wantTxHash}
+	wantTxHash := mock.txData.Result
+	txs := []ethereum.Transaction{wantTxHash}
 	mock.blockInfo.Result.Transactions = txs
 
 	return mock

@@ -39,5 +39,5 @@ func normalizeAddress(s string) string {
 		addr = w
 	}
 
-	return pfx + addr
+	return strings.ToLower(pfx + addr)
 }

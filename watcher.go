@@ -9,8 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/aalbacetef/txnotify/ethereum"
 	"github.com/aalbacetef/txnotify/rpc"
 )
@@ -25,8 +23,14 @@ type Notifier interface {
 	Notify(address string, txList []ethereum.Transaction)
 }
 
+type Config struct {
+	PollInterval time.Duration
+	BatchSize    int
+	BatchDelay   time.Duration
+}
+
 // NewWatcher initializes a new Watcher instance with a JSON-RPC client, logger, in-memory cache, and notifier.
-func NewWatcher(rpcEndpoint string, pollInterval time.Duration, notifier Notifier) (*Watcher, error) {
+func NewWatcher(rpcEndpoint string, cfg Config, notifier Notifier) (*Watcher, error) {
 	client, err := rpc.NewClient(rpc.ClientOptions{
 		Endpoint: rpcEndpoint,
 	})
@@ -34,8 +38,25 @@ func NewWatcher(rpcEndpoint string, pollInterval time.Duration, notifier Notifie
 		return nil, fmt.Errorf("could not initialize client: %w", err)
 	}
 
+	pollInterval := cfg.PollInterval
+	if pollInterval == 0 {
+		pollInterval = defaultPollInterval
+	}
+
+	batchSize := cfg.BatchSize
+	if batchSize == 0 {
+		batchSize = defaultBatchSize
+	}
+
+	batchDelay := cfg.BatchDelay
+	if batchDelay == 0 {
+		batchDelay = defaultBatchDelay
+	}
+
 	watcher := &Watcher{
 		pollInterval: pollInterval,
+		batchSize:    batchSize,
+		batchDelay:   batchDelay,
 		rpcClient:    client,
 		logger:       slog.New(slog.NewJSONHandler(os.Stdout, nil)),
 		cache:        NewInMemoryCache(),
@@ -45,11 +66,19 @@ func NewWatcher(rpcEndpoint string, pollInterval time.Duration, notifier Notifie
 	return watcher, nil
 }
 
+const (
+	defaultPollInterval = 15 * time.Second
+	defaultBatchSize    = 35
+	defaultBatchDelay   = 3 * time.Second
+)
+
 type Watcher struct {
 	mu            sync.Mutex
 	subscriptions []string
 	cancel        context.CancelFunc
 	pollInterval  time.Duration
+	batchSize     int
+	batchDelay    time.Duration
 	rpcClient     RPCClient
 	cache         Cache
 	currentBlock  string
@@ -144,6 +173,10 @@ func (watcher *Watcher) processNextBlock() { //nolint:funlen
 	if state.currentBlock == "" {
 		offset = 0
 		state.currentBlock = state.latestBlock
+
+		watcher.mu.Lock()
+		watcher.currentBlock = state.latestBlock
+		watcher.mu.Unlock()
 	}
 
 	currentBlockNum, err := strToHex(state.currentBlock)
@@ -152,60 +185,32 @@ func (watcher *Watcher) processNextBlock() { //nolint:funlen
 		return
 	}
 
-	nextBlockNum := numToStr(currentBlockNum + offset)
-	watcher.logger.Info("processing next block", "nextBlockNum", nextBlockNum)
+	nextBlockNum := state.currentBlock
 
-	// @TODO: check if block as been processed
-	// @TODO: check cache for block info, so no need to refetch
+	processed, err := watcher.cache.GetBlockProcessed(state.currentBlock)
+	if err == nil && processed {
+		nextBlockNum = numToStr(currentBlockNum + offset)
+	}
 
-	blockInfoResp, err := watcher.rpcClient.GetBlockByNumber(nextBlockNum)
+	watcher.logger.Info(
+		"processing next block",
+		"latestBlock", state.latestBlock,
+		"nextBlockNum", nextBlockNum,
+		"currentBlockNum", state.currentBlock,
+	)
+
+	block, err := watcher.fetchBlockInfoIfNotExist(nextBlockNum)
 	if err != nil {
-		watcher.logger.Error("could not get block info", "blockNum", nextBlockNum)
+		watcher.logger.Error("fetchBlockInfo failed", "blockNum", nextBlockNum, "error", err)
 		return
 	}
 
-	if err := watcher.cache.AddBlock(nextBlockNum, blockInfoResp.Result); err != nil {
-		watcher.logger.Error("could not store block info to cache", "error", err)
-		return
-	}
-
-	count := len(blockInfoResp.Result.Transactions)
+	count := len(block.Transactions)
 
 	watcher.logger.Info(
 		"got block info",
 		"txCount", count,
 	)
-
-	const (
-		batchSize = 25
-		delay     = 2 * time.Second
-	)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	grp, _ := errgroup.WithContext(ctx)
-
-	for k, _txHash := range blockInfoResp.Result.Transactions {
-		if k%batchSize == 0 {
-			time.Sleep(delay)
-		}
-
-		txHash := _txHash
-
-		grp.Go(func() error {
-			return watcher.fetchTxIfNotExist(txHash)
-		})
-	}
-
-	if err := grp.Wait(); err != nil {
-		watcher.logger.Info(
-			"fetching transactions failed, block will be reprocessed",
-			"blockNum", nextBlockNum,
-			"error", err,
-		)
-		return
-	}
 
 	if err := watcher.cache.SetBlockProcessed(nextBlockNum); err != nil {
 		watcher.logger.Error(
@@ -249,6 +254,24 @@ func (watcher *Watcher) copyState() State {
 	}
 }
 
+// fetchBlockInfoIfNotExistchecks if a block is already cached, and fetches it from the blockchain if not.
+func (watcher *Watcher) fetchBlockInfoIfNotExist(blockNum string) (ethereum.Block, error) {
+	if block, err := watcher.cache.GetBlock(blockNum); err == nil {
+		return block, nil
+	}
+
+	blockInfoResp, err := watcher.rpcClient.GetBlockByNumber(blockNum)
+	if err != nil {
+		return ethereum.Block{}, fmt.Errorf("could not get block info: %w", err)
+	}
+
+	if err := watcher.cache.AddBlock(blockNum, blockInfoResp.Result); err != nil {
+		return ethereum.Block{}, fmt.Errorf("could not store block info to cache: %w", err)
+	}
+
+	return blockInfoResp.Result, nil
+}
+
 // fetchTxIfNotExist checks if a transaction is already cached, and fetches it from the blockchain if not.
 func (watcher *Watcher) fetchTxIfNotExist(txHash string) error {
 	_, err := watcher.cache.GetTx(txHash)
@@ -283,15 +306,7 @@ func (watcher *Watcher) notifyForBlock(blockNum string, subs []string) {
 		return
 	}
 
-	for _, txHash := range block.Transactions {
-		tx, err := watcher.cache.GetTx(txHash)
-		if err != nil {
-			watcher.logger.Error("cache.GetTx failed", "txHash", txHash, "error", err)
-			// NOTE: we skip, but a future improvement would be to reprocess
-			// though it's hard to reach tx not found here, instead you'd have cache errors/bugs
-			continue
-		}
-
+	for _, tx := range block.Transactions {
 		from := normalizeAddress(tx.From)
 		txxMap[from] = append(txxMap[from], tx)
 

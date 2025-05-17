@@ -64,7 +64,9 @@ func NewServer(addr, rpcEndpoint, pollInterval string) (*Server, error) {
 
 func (s *Server) Start(ctx context.Context) error {
 	notifier := &WebsocketNotifier{server: s}
-	watcher, err := txnotify.NewWatcher(s.rpcEndpoint, s.pollInterval, notifier)
+	cfg := txnotify.Config{PollInterval: s.pollInterval}
+
+	watcher, err := txnotify.NewWatcher(s.rpcEndpoint, cfg, notifier)
 	if err != nil {
 		return fmt.Errorf("NewWatcher: %w", err)
 	}

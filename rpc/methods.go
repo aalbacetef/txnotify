@@ -16,12 +16,12 @@ func (client *Client) GetCurrentBlockNumber() (*Response[string], error) {
 	return Do[string](client, endpoint, []any{})
 }
 
-// GetBlockByNumber will return block information (hash and transaction hashes) given
+// GetBlockByNumber will return block information (hash and transactions) given
 // the block's number as a hex-string.
 func (client *Client) GetBlockByNumber(blockNum string) (*Response[ethereum.Block], error) {
 	endpoint := getBlockByNumberEndpoint
 
-	const getFullBlock = false
+	const getFullBlock = true
 
 	params := []any{
 		blockNum,

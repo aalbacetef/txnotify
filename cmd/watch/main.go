@@ -4,6 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
+	"os"
 	"time"
 
 	"github.com/aalbacetef/txnotify"
@@ -13,8 +15,14 @@ import (
 type mockNotifier struct{}
 
 func (mockNotifier) Notify(address string, txList []ethereum.Transaction) {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
 	for _, tx := range txList {
-		fmt.Printf("%s) got tx: %s\n", address, tx.Hash)
+		logger.Info(
+			"notification: got tx",
+			"address", address,
+			"hash", tx.Hash,
+		)
 	}
 }
 
@@ -40,7 +48,9 @@ func main() {
 		return
 	}
 
-	watcher, err := txnotify.NewWatcher(rpcEndpoint, interval, mockNotifier{})
+	cfg := txnotify.Config{PollInterval: interval}
+
+	watcher, err := txnotify.NewWatcher(rpcEndpoint, cfg, mockNotifier{})
 	if err != nil {
 		fmt.Println("error: ", err)
 		return
