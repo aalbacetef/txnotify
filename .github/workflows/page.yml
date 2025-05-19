@@ -19,7 +19,9 @@ jobs:
 
       - run: cd webui/ && bun i
       - run: make build-wasm 
-      - run: make bundle
+      - run: |
+          export VITE_BASE_URL=/txnotify/ 
+          make bundle
 
       - id: deployment
         uses: actions/upload-pages-artifact@v3
