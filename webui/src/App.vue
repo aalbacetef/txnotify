@@ -17,6 +17,19 @@ const endpoints = ref<Endpoint[]>([]);
 const workerPeer = inject<WorkerPeer>('workerPeer');
 const customRPCURL = ref<string>('');
 const started = ref<boolean>(false);
+const customEndpointSet = ref<boolean>(false);
+
+const rpcEndpointReady = computed(() => {
+  if (rpcEndpoint.value === 'custom' && customEndpointSet.value) {
+    return true;
+  }
+
+  if (rpcEndpoint.value === '' || rpcEndpoint.value === 'custom') {
+    return false;
+  }
+
+  return true;
+});
 
 workerPeer!.setStore(store);
 
@@ -36,6 +49,10 @@ function handleEndpointSelected() {
 }
 
 function handleSubscribeClicked() {
+  if (started.value) {
+    return;
+  }
+
   const address = ethAddress.value;
   if (address.trim() === '') {
     return;
@@ -47,6 +64,7 @@ function handleSubscribeClicked() {
 }
 
 function setCustomRPCEndpoint() {
+  customEndpointSet.value = true;
   workerPeer!.updateSettings({ rpcEndpoint: customRPCURL.value });
 }
 </script>
@@ -89,14 +107,16 @@ function setCustomRPCEndpoint() {
           </div>
         </div>
 
-        <div class="button">
-          <button @click="handleSubscribeClicked">Subscribe</button>
-          <button v-if="rpcEndpoint === 'custom'" @click="setCustomRPCEndpoint">
+        <div class="button subscribe">
+          <button :disabled="started" @click="handleSubscribeClicked">Subscribe</button>
+        </div>
+        <div class="button" v-if="rpcEndpoint === 'custom'">
+          <button @click="setCustomRPCEndpoint">
             Set custom RPC endpoint
           </button>
         </div>
 
-        <notification-list :eth-address="ethAddress"></notification-list>
+        <notification-list :started="started" :eth-address="ethAddress"></notification-list>
       </div>
     </div>
   </main>
@@ -125,5 +145,9 @@ function setCustomRPCEndpoint() {
 
 .subtitle {
   margin-bottom: 1rem !important;
+}
+
+.button.subscribe {
+  margin-right: 5px;
 }
 </style>

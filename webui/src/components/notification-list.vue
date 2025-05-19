@@ -2,10 +2,12 @@
 import { computed } from 'vue';
 import { useTransactionStore } from '@/stores/transactions';
 
-defineProps<{ ethAddress: string }>();
+const props = defineProps<{ ethAddress: string; started: boolean; }>();
 
 const store = useTransactionStore();
 const transactions = computed(() => store.transactions.toReversed());
+
+const loading = computed(() => props.started && transactions.value.length === 0);
 </script>
 
 
@@ -14,15 +16,16 @@ const transactions = computed(() => store.transactions.toReversed());
   <div class="transaction-list">
     <h2 class="subtitle is-5">
       Transactions
+      <button v-if="loading" class="button is-loading"></button>
       <span v-if="transactions.length > 0">
         ({{ transactions.length }})
       </span>
     </h2>
-    <div class="notification is-info" v-if="!transactions.length && ethAddress">
+    <div class="notification is-info" v-if="started">
       <p>Listening for transactions...</p>
     </div>
-    <div class="notification is-warning" v-else-if="!ethAddress">
-      <p>Please enter a valid Ethereum address.</p>
+    <div class="notification is-primary" v-else-if="!started">
+      <p>Please enter a valid Ethereum address, select and endpoint and hit subscribe.</p>
     </div>
     <article class="message is-dark" v-for="tx in transactions" :key="tx.hash">
       <div class="message-header">
@@ -50,5 +53,11 @@ const transactions = computed(() => store.transactions.toReversed());
 
 .message-body {
   word-break: break-all;
+}
+
+.button.is-loading {
+  width: 30px;
+  height: 30px;
+  border: 0;
 }
 </style>
