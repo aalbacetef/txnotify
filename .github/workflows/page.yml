@@ -1,0 +1,45 @@
+name: Deploy Page
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+      - uses: oven-sh/setup-bun@v2
+        with:
+         bun-version: latest
+
+      - run: cd webui/ && bun i
+      - run: make build-wasm 
+      - run: make bundle
+
+      - id: deployment
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: webui/dist/
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      pages: write
+      id-token: write 
+
+    environment:
+      name: github-pages 
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    # only run when on master
+    if: ${{ github.ref == 'refs/heads/master' }} 
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+

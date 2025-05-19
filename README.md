@@ -5,18 +5,10 @@
 
 `txnotify` is an Ethereum transaction observer that tracks incoming and outgoing transactions for subscribed addresses using Ethereum's JSON-RPC API. It pushes real-time updates to clients via WebSockets, making it suitable for integration with notification systems or wallet UIs.
 
-Notes:
- - the core type is the `Watcher` 
- - there is a CLI tool as well as a WebSockets server and client
+It includes both a CLI debugging tool, a simple websockets client/server, as well as a Vue SPA that embeds it using WASM.
 
-## Features
+Check out the app here: [aalbacetef.github.io/txnotify](https://aalbacetef.github.io/txnotify)
 
-- Polls Ethereum blocks for new transactions
-- Subscribes to and monitors any number of addresses
-- Caches fetched blocks and transactions in memory
-- Pushes notifications to clients over WebSockets
-- Only external dependency is gorilla/websockets
-- Extensible interfaces for RPC, storage, and notifier logic
 
 ## Architecture
 
@@ -74,28 +66,11 @@ go run ./cmd/watch --address 0xdAC17F958D2ee523a2206206994597C13D831ec7
 go run ./cmd/watch --address 0xdAC17F958D2ee523a2206206994597C13D831ec7 | jq
 ```
 
-## Configuration
 
-The RPC endpoint and polling interval can be set directly in the `main` or passed as arguments/environment variables in a production setup.
-
-## Testing
-
-Unit tests for core logic are included:
-
-```bash
-make test
-```
-
-Tests cover:
-- JSON-RPC implementation 
-- Cache behavior 
-- Hex utilities
-
-The `cmd/watch`, `cmd/server`, and `cmd/client` binaries serve as integration tests.
 
 ## Roadmap
 
-- Add persistent storage backend (e.g., file or Redis)
+- Add persistent storage backend (e.g: file or Redis)
 - Improve reprocessing of failed or incomplete blocks
 - Move a lot of the processing to a separate job system/message queue
 - Enrich notifications with detailed transaction data
@@ -105,7 +80,6 @@ The `cmd/watch`, `cmd/server`, and `cmd/client` binaries serve as integration te
 
 - Could potentially retry blocks continuously
 - In-memory cache only; restarts clear state
-- No batching or pipelining of RPC calls beyond transaction fetch concurrency
 - Clients will timeout if no messages come in 
 
 
