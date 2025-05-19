@@ -4,9 +4,13 @@ import { WorkerPeer } from '@/lib/peer';
 import { getEndpoints, type Endpoint } from '@/lib/tx';
 
 import { useTransactionStore } from '@/stores/transactions';
+import { useNotificationsStore } from '@/stores/notifications';
+
 
 const store = useTransactionStore();
+const ns = useNotificationsStore();
 
+import AppNotifications from '@/components/app-notifications.vue';
 import NotificationList from '@/components/notification-list.vue';
 import ToggleMode from '@/components/toggle-mode.vue';
 
@@ -40,7 +44,6 @@ workerPeer!.setStore(store);
 
 
 function handleEndpointSelected() {
-  console.log('endpoint selected');
   if (rpcEndpoint.value === "custom") {
     return;
   }
@@ -64,8 +67,13 @@ function handleSubscribeClicked() {
 }
 
 function setCustomRPCEndpoint() {
+  if (customRPCURL.value.trim() === '') {
+    return;
+  }
+
   customEndpointSet.value = true;
   workerPeer!.updateSettings({ rpcEndpoint: customRPCURL.value });
+  ns.pushNotification("custom endpoint has been set!");
 }
 </script>
 
@@ -107,23 +115,28 @@ function setCustomRPCEndpoint() {
           </div>
         </div>
 
-        <div class="button subscribe">
-          <button :disabled="started" @click="handleSubscribeClicked">Subscribe</button>
-        </div>
-        <div class="button" v-if="rpcEndpoint === 'custom'">
-          <button @click="setCustomRPCEndpoint">
+        <div class="buttons">
+          <button class="button subscribe" :disabled="started" @click="handleSubscribeClicked">Subscribe</button>
+          <button class="button" v-if="rpcEndpoint === 'custom'" @click="setCustomRPCEndpoint">
             Set custom RPC endpoint
           </button>
+
         </div>
 
         <notification-list :started="started" :eth-address="ethAddress"></notification-list>
       </div>
     </div>
+
+    <app-notifications></app-notifications>
   </main>
 </template>
 
 
 <style scoped>
+main {
+  position: relative;
+}
+
 .header-row {
   display: flex;
   flex-direction: row;
