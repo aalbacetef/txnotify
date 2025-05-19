@@ -17,6 +17,7 @@ jobs:
         with:
          bun-version: latest
 
+      - run: cd webui/ && bun i
       - run: make build-wasm 
       - run: make bundle
 
