@@ -20,6 +20,6 @@ workerPeer.on(Event.WASMLoaded, () => {
   app.mount('#app');
 });
 
-workerPeer.loadWASM(new URL('txnotify.wasm', document.baseURI).toString());
+workerPeer.loadWASM(new URL('txnotify-wasm', document.baseURI).toString());
 
 
