@@ -38,7 +38,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     # only run when on master
-    if: ${{ github.ref }} == 'refs/heads/master'
+    if: ${{ github.ref == 'refs/heads/master' }} 
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
