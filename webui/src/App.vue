@@ -57,16 +57,20 @@ function handleSubscribeClicked() {
     return;
   }
 
-  if (!rpcEndpointReady.value) {
+  const address = ethAddress.value;
+  if (address.trim() === '') {
     ns.pushNotification(
-      'Please select an RPC endpoint',
+      'Please enter an address',
       Status.Error,
     );
     return;
   }
 
-  const address = ethAddress.value;
-  if (address.trim() === '') {
+  if (!rpcEndpointReady.value) {
+    ns.pushNotification(
+      'Please select an RPC endpoint',
+      Status.Error,
+    );
     return;
   }
 
