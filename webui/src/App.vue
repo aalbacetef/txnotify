@@ -2,12 +2,17 @@
 import { inject, ref, computed } from 'vue';
 import { WorkerPeer } from '@/lib/peer';
 import { getEndpoints, type Endpoint } from '@/lib/tx';
+import { Status } from '@/lib/status';
 
 import { useTransactionStore } from '@/stores/transactions';
+import { useNotificationsStore } from '@/stores/notifications';
+
 
 const store = useTransactionStore();
+const ns = useNotificationsStore();
 
-import NotificationList from '@/components/notification-list.vue';
+import AppNotifications from '@/components/app-notifications.vue';
+import TransactionList from '@/components/transaction-list.vue';
 import ToggleMode from '@/components/toggle-mode.vue';
 
 
@@ -17,6 +22,19 @@ const endpoints = ref<Endpoint[]>([]);
 const workerPeer = inject<WorkerPeer>('workerPeer');
 const customRPCURL = ref<string>('');
 const started = ref<boolean>(false);
+const customEndpointSet = ref<boolean>(false);
+
+const rpcEndpointReady = computed(() => {
+  if (rpcEndpoint.value === 'custom' && customEndpointSet.value) {
+    return true;
+  }
+
+  if (rpcEndpoint.value === '' || rpcEndpoint.value === 'custom') {
+    return false;
+  }
+
+  return true;
+});
 
 workerPeer!.setStore(store);
 
@@ -27,7 +45,6 @@ workerPeer!.setStore(store);
 
 
 function handleEndpointSelected() {
-  console.log('endpoint selected');
   if (rpcEndpoint.value === "custom") {
     return;
   }
@@ -36,8 +53,24 @@ function handleEndpointSelected() {
 }
 
 function handleSubscribeClicked() {
+  if (started.value) {
+    return;
+  }
+
   const address = ethAddress.value;
   if (address.trim() === '') {
+    ns.pushNotification(
+      'Please enter an address',
+      Status.Error,
+    );
+    return;
+  }
+
+  if (!rpcEndpointReady.value) {
+    ns.pushNotification(
+      'Please select an RPC endpoint',
+      Status.Error,
+    );
     return;
   }
 
@@ -47,7 +80,13 @@ function handleSubscribeClicked() {
 }
 
 function setCustomRPCEndpoint() {
+  if (customRPCURL.value.trim() === '') {
+    return;
+  }
+
+  customEndpointSet.value = true;
   workerPeer!.updateSettings({ rpcEndpoint: customRPCURL.value });
+  ns.pushNotification("custom endpoint has been set!");
 }
 </script>
 
@@ -89,21 +128,28 @@ function setCustomRPCEndpoint() {
           </div>
         </div>
 
-        <div class="button">
-          <button @click="handleSubscribeClicked">Subscribe</button>
-          <button v-if="rpcEndpoint === 'custom'" @click="setCustomRPCEndpoint">
+        <div class="buttons">
+          <button class="button subscribe" :disabled="started" @click="handleSubscribeClicked">Subscribe</button>
+          <button class="button" v-if="rpcEndpoint === 'custom'" @click="setCustomRPCEndpoint">
             Set custom RPC endpoint
           </button>
+
         </div>
 
-        <notification-list :eth-address="ethAddress"></notification-list>
+        <transaction-list :started="started" :eth-address="ethAddress"></transaction-list>
       </div>
     </div>
+
+    <app-notifications></app-notifications>
   </main>
 </template>
 
 
 <style scoped>
+main {
+  position: relative;
+}
+
 .header-row {
   display: flex;
   flex-direction: row;
@@ -125,5 +171,9 @@ function setCustomRPCEndpoint() {
 
 .subtitle {
   margin-bottom: 1rem !important;
+}
+
+.button.subscribe {
+  margin-right: 5px;
 }
 </style>
