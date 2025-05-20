@@ -8,7 +8,10 @@ const store = useTransactionStore();
 const transactions = computed(() => store.transactions.toReversed());
 
 const loading = computed(() => props.started && transactions.value.length === 0);
-const etherURL = txHash => `https://etherscan.io/tx/${txHash}`;
+
+function etherURL(txHash: string): string {
+  return `https://etherscan.io/tx/${txHash}`;
+}
 </script>
 
 
