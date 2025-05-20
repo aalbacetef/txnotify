@@ -2,6 +2,7 @@
 import { inject, ref, computed } from 'vue';
 import { WorkerPeer } from '@/lib/peer';
 import { getEndpoints, type Endpoint } from '@/lib/tx';
+import { Status } from '@/lib/status';
 
 import { useTransactionStore } from '@/stores/transactions';
 import { useNotificationsStore } from '@/stores/notifications';
@@ -11,7 +12,7 @@ const store = useTransactionStore();
 const ns = useNotificationsStore();
 
 import AppNotifications from '@/components/app-notifications.vue';
-import NotificationList from '@/components/notification-list.vue';
+import TransactionList from '@/components/transaction-list.vue';
 import ToggleMode from '@/components/toggle-mode.vue';
 
 
@@ -53,6 +54,14 @@ function handleEndpointSelected() {
 
 function handleSubscribeClicked() {
   if (started.value) {
+    return;
+  }
+
+  if (!rpcEndpointReady.value) {
+    ns.pushNotification(
+      'Please select an RPC endpoint',
+      Status.Error,
+    );
     return;
   }
 
@@ -123,7 +132,7 @@ function setCustomRPCEndpoint() {
 
         </div>
 
-        <notification-list :started="started" :eth-address="ethAddress"></notification-list>
+        <transaction-list :started="started" :eth-address="ethAddress"></transaction-list>
       </div>
     </div>
 
