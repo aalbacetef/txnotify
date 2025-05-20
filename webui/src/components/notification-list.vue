@@ -8,6 +8,7 @@ const store = useTransactionStore();
 const transactions = computed(() => store.transactions.toReversed());
 
 const loading = computed(() => props.started && transactions.value.length === 0);
+const etherURL = txHash => `https://etherscan.io/tx/${txHash}`;
 </script>
 
 
@@ -37,6 +38,11 @@ const loading = computed(() => props.started && transactions.value.length === 0)
         <p><strong>To:</strong> {{ tx.to }}</p>
         <p><strong>Value:</strong> {{ tx.value }} ETH</p>
         <p><strong>Block:</strong> {{ tx.blockNumber }}</p>
+        <p class="view-on-etherscan">
+          <a class="button" target="_blank" :href="etherURL(tx.hash)">
+            View on Etherscan
+          </a>
+        </p>
       </div>
     </article>
   </div>
@@ -59,5 +65,9 @@ const loading = computed(() => props.started && transactions.value.length === 0)
   width: 30px;
   height: 30px;
   border: 0;
+}
+
+.view-on-etherscan {
+  text-align: right;
 }
 </style>
