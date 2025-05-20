@@ -14,8 +14,6 @@ function etherURL(txHash: string): string {
 }
 </script>
 
-
-
 <template>
   <div class="transaction-list">
     <h2 class="subtitle is-5">
